@@ -4,6 +4,6 @@
 // data can only be reached through the rolo_* functions in supabase/rolo.sql.
 // Leave both blank to run Rolo on this device only.
 window.ROLO_CONFIG = {
-  supabaseUrl: '',
-  supabaseKey: ''
+  supabaseUrl: 'https://qjmefypqidheyuzkrlqu.supabase.co',
+  supabaseKey: 'sb_publishable__QoKgDZSuerubzX-TOEh2A_bBLSsmwc'
 };
