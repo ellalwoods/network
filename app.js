@@ -6,6 +6,7 @@
 
 const CFG = window.ROLO_CONFIG || {};
 const SYNC_ON = !!(CFG.supabaseUrl && CFG.supabaseKey);
+const PROJECT = ((CFG.supabaseUrl||'').match(/https:\/\/([^.]+)\./)||[])[1] || '';
 
 /* ---------- constants ---------- */
 const PALETTE = [
@@ -96,7 +97,7 @@ const photoOf = p => PH[p.id] && PH[p.id].d;
 async function rpc(fn, args){
   const r = await fetch(`${CFG.supabaseUrl.replace(/\/$/,'')}/rest/v1/rpc/${fn}`, {method:'POST',
     headers:{apikey:CFG.supabaseKey, ...(CFG.supabaseKey.startsWith('eyJ') ? {Authorization:'Bearer '+CFG.supabaseKey} : {}), 'Content-Type':'application/json'}, body:JSON.stringify(args)});
-  if(r.status === 404) throw new Error('NOT_SETUP');
+  if(r.status === 404){ console.warn('rpc 404', fn, await r.text()); throw new Error('NOT_SETUP') }
   if(!r.ok) throw new Error((await r.text()).slice(0,200) || r.statusText);
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
@@ -140,7 +141,7 @@ async function syncNow(){
     sync.state = 'ok'; sync.last = now(); sync.err = '';
   }catch(e){
     sync.state = 'error';
-    sync.err = e.message === 'NOT_SETUP' ? 'The sync database isn’t set up yet. Your changes are safe on this device.' : 'Couldn’t reach the sync server. Your changes are safe on this device and will sync later.';
+    sync.err = e.message === 'NOT_SETUP' ? `Supabase project “${PROJECT}” doesn’t have Network’s tables yet. Your changes are safe on this device.` : 'Couldn’t reach the sync server. Your changes are safe on this device and will sync later.';
     console.warn('sync', e);
   }
   syncing = false; softRender();
@@ -526,7 +527,7 @@ async function submitLogin(){
     }
   }catch(e){
     console.warn(e);
-    L.msg = e.message === 'NOT_SETUP' ? 'The sync database isn’t set up yet (run supabase/rolo.sql). Tap “Not now” to keep working on this device.'
+    L.msg = e.message === 'NOT_SETUP' ? `Supabase project “${PROJECT}” doesn’t have Network’s tables yet. In Supabase, open that exact project → SQL Editor and run the setup script. Tap “Not now” to keep working on this device meanwhile.`
       : 'Couldn’t reach the sync server. Check your connection, or tap “Not now” to keep working on this device.';
   }
   L.busy = false; render();
