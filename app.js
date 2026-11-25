@@ -95,7 +95,7 @@ const photoOf = p => PH[p.id] && PH[p.id].d;
 /* ---------- sync ---------- */
 async function rpc(fn, args){
   const r = await fetch(`${CFG.supabaseUrl.replace(/\/$/,'')}/rest/v1/rpc/${fn}`, {method:'POST',
-    headers:{apikey:CFG.supabaseKey, Authorization:'Bearer '+CFG.supabaseKey, 'Content-Type':'application/json'}, body:JSON.stringify(args)});
+    headers:{apikey:CFG.supabaseKey, ...(CFG.supabaseKey.startsWith('eyJ') ? {Authorization:'Bearer '+CFG.supabaseKey} : {}), 'Content-Type':'application/json'}, body:JSON.stringify(args)});
   if(r.status === 404) throw new Error('NOT_SETUP');
   if(!r.ok) throw new Error((await r.text()).slice(0,200) || r.statusText);
   const t = await r.text(); return t ? JSON.parse(t) : null;
