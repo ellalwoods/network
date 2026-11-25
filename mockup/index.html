@@ -166,6 +166,8 @@ main{min-width:0;padding:0 0 96px}
 .pick button span{font-size:10px}
 .pick button.on{background:var(--ink);color:var(--white)}
 #enter:disabled{background:var(--soft);color:var(--grey);cursor:default}
+.ramp{display:grid;grid-template-columns:80px repeat(4,1fr);align-items:center;gap:4px;margin-top:10px}
+.ramp i{height:22px;box-shadow:inset 0 0 0 .5px rgba(17,17,16,.2)}
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(17,17,16,.25);display:none;z-index:30;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
@@ -236,9 +238,20 @@ const gc = p => G(p.groups[0]).c;
 // pick ink or white text depending on how light the brand colour is
 const lum = h => { const [r,g,b]=[1,3,5].map(i=>parseInt(h.substr(i,2),16)/255); return .2126*r+.7152*g+.0722*b };
 const on = h => lum(h)>.55 ? '#111110' : '#FBFAF7';
-const tint = p => state.colour ? `${gc(p)};color:${on(gc(p))}` : 'var(--faint)';
+const tint = p => state.colour ? `${TP(p).soft};color:${TP(p).deep}` : 'var(--faint)';
 // solid tint: blend a group colour into the paper colour (keeps orbit lines from showing through)
 const mix = (hex,t) => '#'+[1,3,5].map(i=>Math.round(parseInt(hex.substr(i,2),16)*t+[0xF3,0xF2,0xEE][(i-1)/2]*(1-t)).toString(16).padStart(2,'0')).join('');
+// blend toward ink for deep shades
+const mixI = (hex,t) => '#'+[1,3,5].map(i=>Math.round(parseInt(hex.substr(i,2),16)*(1-t)+0x11*t).toString(16).padStart(2,'0')).join('');
+// deep shade that keeps the hue (periwinkle -> indigo, peach -> rust) instead of going muddy grey
+const darkHue = hex => { let [r,g,b]=[1,3,5].map(i=>parseInt(hex.substr(i,2),16)/255); const mx=Math.max(r,g,b), mn=Math.min(r,g,b); let h=0,sat=0; const l=(mx+mn)/2;
+  if(mx!==mn){ const d=mx-mn; sat=l>.5?d/(2-mx-mn):d/(mx+mn); h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4; h/=6 }
+  sat=Math.min(sat,.62); const L=.27, q=L<.5?L*(1+sat):L+sat-L*sat, pp=2*L-q;
+  const f=t=>{t<0&&(t+=1);t>1&&(t-=1);return t<1/6?pp+(q-pp)*6*t:t<.5?q:t<2/3?pp+(q-pp)*(2/3-t)*6:pp};
+  return '#'+[h+1/3,h,h-1/3].map(t=>Math.round(f(t)*255).toString(16).padStart(2,'0')).join('') };
+// Tonal range for each brand colour: wash (faded) -> soft -> base (bright) -> deep (for text)
+const T = h => { const L=lum(h); return { wash:mix(h,.13), soft:mix(h,L>.6?.55:.32), base:h, deep:L<.12?h:darkHue(h) } };
+const TP = p => T(gc(p));
 const deep = p => state.colour ? `${gc(p)};color:${on(gc(p))}` : 'var(--ink)';
 const sw = g => state.colour ? `<i class="sw" style="background:${g.c}"></i>` : '';
 function setHex(id,h){ P(id).hex=h; localStorage.setItem('rolo-palette',JSON.stringify(palette.map(x=>[x.id,x.hex]))); render() }
@@ -268,14 +281,18 @@ function openPerson(id){ state.person=id; go('person') }
 function orbitSVG(){
   const C=210, R={1:78,2:132,3:186}, n=groups.length, step=2*Math.PI/n, start=-Math.PI/2;
   let s = `<svg class="orbit" viewBox="0 0 420 420" font-family="JetBrains Mono, monospace">`;
+  if(state.colour) groups.forEach((g,gi)=>{
+    const a0=start+gi*step, a1=a0+step, r0=30, r1=196, pt=(r,a)=>`${C+r*Math.cos(a)} ${C+r*Math.sin(a)}`;
+    const dim = state.filter!=='all'&&state.filter!==g.id;
+    s+=`<path d="M${pt(r0,a0)} L${pt(r1,a0)} A${r1} ${r1} 0 0 1 ${pt(r1,a1)} L${pt(r0,a1)} A${r0} ${r0} 0 0 0 ${pt(r0,a0)}Z" fill="${T(g.c).wash}" opacity="${dim?.35:1}"/>`;
+  });
   [R[1],R[2],R[3]].forEach(r=>s+=`<circle cx="${C}" cy="${C}" r="${r}" fill="none" stroke="#8C8B86" stroke-width=".6" stroke-dasharray="2 4"/>`);
   groups.forEach((g,gi)=>{
     const a=start+gi*step;
     s+=`<line x1="${C+34*Math.cos(a)}" y1="${C+34*Math.sin(a)}" x2="${C+204*Math.cos(a)}" y2="${C+204*Math.sin(a)}" stroke="#D9D7D0" stroke-width=".8"/>`;
     const m=a+step/2, lx=C+201*Math.cos(m), ly=C+201*Math.sin(m);
     const dim = state.filter!=='all'&&state.filter!==g.id;
-    if(state.colour) s+=`<circle cx="${lx-g.short.length*3.1-8}" cy="${ly}" r="3.5" fill="${g.c}" stroke="#111110" stroke-width=".4" opacity="${dim?.25:1}"/>`;
-    s+=`<text x="${lx}" y="${ly}" font-size="9" letter-spacing=".8" text-anchor="middle" dominant-baseline="middle" fill="#111110" opacity="${dim?.25:1}" style="cursor:pointer" onclick="state.filter=state.filter==='${g.id}'?'all':'${g.id}';render()">${g.short.toUpperCase()}</text>`;
+    s+=`<text x="${lx}" y="${ly}" font-size="9" letter-spacing=".8" text-anchor="middle" dominant-baseline="middle" fill="${state.colour?T(g.c).deep:'#111110'}" font-weight="${state.colour?600:400}" opacity="${dim?.25:1}" style="cursor:pointer" onclick="state.filter=state.filter==='${g.id}'?'all':'${g.id}';render()">${g.short.toUpperCase()}</text>`;
   });
   s+=`<circle cx="${C}" cy="${C}" r="24" fill="#111110"/><text x="${C}" y="${C+1}" font-size="9" letter-spacing="1" text-anchor="middle" dominant-baseline="middle" fill="#FBFAF7">YOU</text>`;
   groups.forEach((g,gi)=>{
@@ -285,9 +302,10 @@ function orbitSVG(){
         const a=start+gi*step+step*(k+1)/(ps.length+1)+(ring===2?.08:0);
         const x=C+R[ring]*Math.cos(a), y=C+R[ring]*Math.sin(a);
         const dim = state.filter!=='all'&&!p.groups.includes(state.filter);
+        const t=TP(p), fill=state.colour?[0,t.base,t.soft,'#FBFAF7'][ring]:'#FBFAF7', txt=state.colour?(ring===1?on(t.base):t.deep):'#111110', stroke=state.colour?(ring===1?t.deep:t.base):'#111110';
         s+=`<g class="node ${dim?'dim':''}" onclick="openPerson(${p.id})">
-          <circle class="face" cx="${x}" cy="${y}" r="15" fill="${state.colour?gc(p):'#FBFAF7'}" stroke="#111110" stroke-width="${state.colour?.6:1}"/>
-          <text class="ini" x="${x}" y="${y+.5}" font-size="9" font-family="Archivo Black, sans-serif" text-anchor="middle" dominant-baseline="middle" fill="${state.colour?on(gc(p)):'#111110'}">${ini(p)}</text>
+          <circle class="face" cx="${x}" cy="${y}" r="15" fill="${fill}" stroke="${stroke}" stroke-width="${state.colour?1.2:1}"/>
+          <text class="ini" x="${x}" y="${y+.5}" font-size="9" font-family="Archivo Black, sans-serif" text-anchor="middle" dominant-baseline="middle" fill="${txt}">${ini(p)}</text>
           ${p.due?`<circle cx="${x+11}" cy="${y-11}" r="3.6" fill="#111110" stroke="#F3F2EE" stroke-width="1.5"/>`:''}
           <text x="${x}" y="${y+26}" font-size="8" text-anchor="middle" fill="#8C8B86">${p.first.toUpperCase()}</text></g>`;
       });
@@ -312,13 +330,13 @@ orbit(){
     <div>
       <div class="filters" style="border-top:0"><button class="${state.filter==='all'?'on':''}" onclick="state.filter='all';render()">All</button>${groups.map(g=>`<button class="${state.filter===g.id?'on':''}" onclick="state.filter='${g.id}';render()">${sw(g)}${g.short}</button>`).join('')}</div>
       ${orbitSVG()}
-      <div class="legend mono grey"><span><i class="lg-due"></i>Due to drill</span><span><i class="lg-ring"></i>Inner ring = closer</span></div>
+      <div class="legend mono grey"><span><i class="lg-due"></i>Due to drill</span><span><i class="lg-ring"></i>Inner ring = closer</span>${state.colour?'<span><i class="lg-ring" style="border:0;background:linear-gradient(90deg,#CCCCFE,#E9E9F8)"></i>Brighter = closer</span>':''}</div>
     </div>
     <div>
       <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Due to drill</span><button class="grey" onclick="go('drill')">Start →</button></div>
       ${due.map((p,i)=>row(p,i+1)).join('')}
       <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Follow-ups</span><span class="grey">${pad(fol.length)}</span></div>
-      ${fol.map((p,i)=>row(p,i+1,`<span class="tagline">${p.follow}</span>`)).join('')}
+      ${fol.map((p,i)=>row(p,i+1,`<span class="tagline" ${state.colour?`style="background:${TP(p).wash};border-color:${TP(p).deep};color:${TP(p).deep}"`:''}>${p.follow}</span>`)).join('')}
     </div>
   </div>`;
 },
@@ -338,7 +356,7 @@ person(){
   <div class="bar mono"><button onclick="go('index')">← Index</button><span class="grey">Entry ${pad(idx)}</span></div>
   <div class="profile" style="border-top:0">
     <div>
-      <div class="portrait" style="background:${tint(p)}">${ini(p)}</div>
+      <div class="portrait" style="background:${state.colour?`${TP(p).soft};color:${TP(p).deep}`:'var(--faint)'}">${ini(p)}</div>
       <div class="pname">${p.first}<br>${p.last}</div>
       <div class="facts">
         <div><span>Role</span><span>${p.role}</span></div>
@@ -349,7 +367,7 @@ person(){
       </div>
     </div>
     <div>
-      <div class="hook"><span class="mono grey">Memory hook</span><p>${p.hook}</p></div>
+      <div class="hook" ${state.colour?`style="background:${TP(p).wash}"`:''}><span class="mono grey">Memory hook</span><p>${p.hook}</p></div>
       ${p.follow?`<div class="hook"><span class="mono grey">Follow-up</span><p>${p.follow}</p></div>`:''}
       <div class="sect mono"><span>Notes</span><button class="grey">+ Add</button></div>
       ${p.notes.length?p.notes.map(([d,t])=>`<div class="note"><span class="mono grey">${d}</span><span>${t}</span></div>`).join(''):'<div class="note"><span class="mono grey">—</span><span class="grey">Nothing yet. Add something they mentioned.</span></div>'}
@@ -368,7 +386,7 @@ drill(){
     <div class="flip ${state.fc.flipped?'on':''}" onclick="state.fc.flipped=!state.fc.flipped;this.classList.toggle('on')">
       <div class="flip-in">
         <div class="fa" style="background:${deep(p)}"><div class="foot mono" style="border-top:0;border-bottom:1px solid #444"><span>${pad(people.indexOf(p)+1)}: Who?</span><span>${G(p.groups[0]).short}</span></div><div class="big">${ini(p)}</div><div class="foot mono" style="border-color:#444"><span>Tap to reveal</span><span>↻</span></div></div>
-        <div class="fb"><div class="pname">${p.first}<br>${p.last}</div>
+        <div class="fb" ${state.colour?`style="background:${TP(p).wash}"`:''}><div class="pname">${p.first}<br>${p.last}</div>
           <div class="facts"><div><span>Role</span><span>${p.role}</span></div><div><span>Team</span><span>${p.team}</span></div><div><span>Met</span><span>${p.met}</span></div></div>
           <div class="hk"><span class="mono grey" style="display:block;margin-bottom:4px">Memory hook</span>${p.hook}</div></div>
       </div>
@@ -380,7 +398,7 @@ groups(){
   return `<div class="bar mono"><span>Rolo / Groups</span><span class="grey">${pad(groups.length)} groups</span></div>
   <div class="title">Groups</div>
   <div style="border-top:1px solid var(--ink)">
-  ${groups.map((g,i)=>`<button class="gl" onclick="state.filter='${g.id}';go('index')"><span class="mono grey">${pad(i+1)}</span><b>${sw(g)}${g.name}</b><span class="ct">${pad(inG(g.id).length)}</span></button>`).join('')}
+  ${groups.map((g,i)=>`<button class="gl" style="${state.colour?`box-shadow:inset 6px 0 0 ${g.c};background:linear-gradient(90deg,${T(g.c).wash},transparent 70%)`:''}" onclick="state.filter='${g.id}';go('index')"><span class="mono grey">${pad(i+1)}</span><b>${sw(g)}${g.name}</b><span class="ct">${pad(inG(g.id).length)}</span></button>`).join('')}
   <button class="gl" onclick="openGroup()"><span class="mono grey">+</span><b class="grey">New group</b><span></span></button></div>`;
 },
 };
@@ -390,6 +408,7 @@ views.settings = function(){
   <div class="title">Settings</div>
   <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Appearance</span></div>
   <div class="set"><div><b>Colour mode</b><small>Give each group its own colour across the orbit, index and drill. Off = black and white.</small></div>${tog(state.colour,`setColour(${!state.colour})`)}</div>
+  ${state.colour?`<div class="set" style="display:block"><b>Tones</b><small>Each colour comes in a faded, soft, bright and deep version. Brighter means closer on your orbit.</small>${groups.map(g=>{const t=T(g.c);return `<div class="ramp"><span class="mono grey">${g.short}</span>${[t.wash,t.soft,t.base,t.deep].map(c=>`<i style="background:${c}"></i>`).join('')}</div>`}).join('')}</div>`:''}
   <div class="set"><div><b>Preview</b><small>${groups.map(g=>`<span class="tagline" style="margin:6px 6px 0 0;display:inline-flex;align-items:center;gap:6px">${state.colour?`<i class="sw" style="background:${g.c};margin:0"></i>`:''}${g.short}</span>`).join('')}</small></div></div>
   ${state.colour?`<div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Group colours</span><span class="grey">Tap a swatch</span></div>
   ${groups.map(g=>`<div class="set"><div><b>${g.name}</b><small>${P(g.pc).firm} · ${P(g.pc).name}</small></div><div class="swatches">${palette.map(x=>`<button class="swb ${g.pc===x.id?'on':''}" style="background:${x.hex}" title="${x.firm} ${x.name}" onclick="setGroupColour('${g.id}','${x.id}')"></button>`).join('')}</div></div>`).join('')}
