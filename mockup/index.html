@@ -139,6 +139,17 @@ main{min-width:0;padding:0 0 96px}
 .gl b{font-family:var(--display);font-size:28px;line-height:1;letter-spacing:-.03em;text-transform:uppercase}
 .gl .ct{font-family:var(--display);font-size:28px;color:var(--grey)}
 
+/* settings */
+.set{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 20px;border-bottom:1px solid var(--soft)}
+@media (min-width:900px){.set{padding:16px 32px}}
+.set b{font-weight:600;font-size:16px;display:block}
+.set small{display:block;color:var(--grey);font-size:13.5px;margin-top:2px;max-width:520px}
+.tog{width:52px;height:30px;border:1px solid var(--ink);border-radius:999px;position:relative;flex:none;background:var(--bg);transition:background .2s}
+.tog i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--ink);transition:transform .2s}
+.tog.on{background:var(--ink)}
+.tog.on i{transform:translateX(22px);background:var(--white)}
+.sw{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
+.filters button.on .sw{outline:1px solid var(--white)}
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(17,17,16,.25);display:none;z-index:30;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
@@ -167,10 +178,10 @@ main{min-width:0;padding:0 0 96px}
 
 <script>
 const groups = [
-  {id:'cohort',  name:'Clerkship cohort', short:'Cohort'},
-  {id:'partners',name:'Partners',         short:'Partners'},
-  {id:'disputes',name:'Disputes team',    short:'Disputes'},
-  {id:'mentors', name:'Mentors',          short:'Mentors'},
+  {id:'cohort',  name:'Clerkship cohort', short:'Cohort',  c:'#5B7DB1'},
+  {id:'partners',name:'Partners',         short:'Partners',c:'#C2913A'},
+  {id:'disputes',name:'Disputes team',    short:'Disputes',c:'#5F9472'},
+  {id:'mentors', name:'Mentors',          short:'Mentors', c:'#9A6FA0'},
 ];
 // ring: 1 = inner (close), 2 = middle, 3 = outer (acquaintance)
 const people = [
@@ -191,18 +202,28 @@ const pad = n => String(n).padStart(3,'0');
 const ini = p => p.first[0]+p.last[0];
 const G = id => groups.find(g=>g.id===id);
 const inG = (g) => people.filter(p=>p.groups.includes(g));
+// colour mode helpers: in B&W mode everything falls back to neutral greys
+const gc = p => G(p.groups[0]).c;
+const tint = p => state.colour ? gc(p)+'33' : 'var(--faint)';
+// solid tint: blend a group colour into the paper colour (keeps orbit lines from showing through)
+const mix = (hex,t) => '#'+[1,3,5].map(i=>Math.round(parseInt(hex.substr(i,2),16)*t+[0xF3,0xF2,0xEE][(i-1)/2]*(1-t)).toString(16).padStart(2,'0')).join('');
+const deep = p => state.colour ? gc(p) : 'var(--ink)';
+const sw = g => state.colour ? `<i class="sw" style="background:${g.c}"></i>` : '';
+function setColour(on){ state.colour=on; localStorage.setItem('rolo-colour',on?'1':'0'); render() }
 
-let state = {view:'orbit', filter:'all', q:'', person:null, fc:{i:0,flipped:false,deck:'all'}};
+let state = {colour: localStorage.getItem('rolo-colour')==='1', view:'orbit', filter:'all', q:'', person:null, fc:{i:0,flipped:false,deck:'all'}};
 
 const nav = [['orbit','Orbit'],['index','Index'],['drill','Drill'],['groups','Groups']];
+const gear = `<button class="mono" onclick="go('settings')">Settings</button>`;
 function renderNav(){
   const v = state.view==='person'?'index':state.view;
   document.getElementById('side').innerHTML =
     `<div class="brand">Rolo</div>` +
     nav.map(([k,l],i)=>`<button class="navbtn ${v===k?'on':''}" onclick="go('${k}')"><span>${l}</span><span>0${i+1}</span></button>`).join('') +
     `<div class="mono grey" style="padding:22px 20px 8px">Groups</div>` +
-    groups.map(g=>`<button class="grp" onclick="state.filter='${g.id}';go('index')"><span>${g.name}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
-    `<button class="newbtn" onclick="openAdd()">+ New person</button>`;
+    groups.map(g=>`<button class="grp" onclick="state.filter='${g.id}';go('index')"><span>${sw(g)}${g.name}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
+    `<button class="navbtn ${v==='settings'?'on':''}" style="margin-top:auto;border-top:1px solid var(--soft)" onclick="go('settings')"><span>Settings</span><span>05</span></button>` +
+    `<button class="newbtn" style="margin-top:0" onclick="openAdd()">+ New person</button>`;
   document.getElementById('tabbar').innerHTML =
     nav.map(([k,l])=>`<button class="${v===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('') +
     `<button class="add" onclick="openAdd()" aria-label="Add person">+</button>`;
@@ -219,7 +240,7 @@ function orbitSVG(){
     s+=`<line x1="${C+34*Math.cos(a)}" y1="${C+34*Math.sin(a)}" x2="${C+204*Math.cos(a)}" y2="${C+204*Math.sin(a)}" stroke="#D9D7D0" stroke-width=".8"/>`;
     const m=a+step/2, lx=C+201*Math.cos(m), ly=C+201*Math.sin(m);
     const dim = state.filter!=='all'&&state.filter!==g.id;
-    s+=`<text x="${lx}" y="${ly}" font-size="9" letter-spacing=".8" text-anchor="middle" dominant-baseline="middle" fill="#111110" opacity="${dim?.25:1}" style="cursor:pointer" onclick="state.filter=state.filter==='${g.id}'?'all':'${g.id}';render()">${g.short.toUpperCase()}</text>`;
+    s+=`<text x="${lx}" y="${ly}" font-size="9" letter-spacing=".8" text-anchor="middle" dominant-baseline="middle" fill="${state.colour?g.c:'#111110'}" opacity="${dim?.25:1}" style="cursor:pointer" onclick="state.filter=state.filter==='${g.id}'?'all':'${g.id}';render()">${g.short.toUpperCase()}</text>`;
   });
   s+=`<circle cx="${C}" cy="${C}" r="24" fill="#111110"/><text x="${C}" y="${C+1}" font-size="9" letter-spacing="1" text-anchor="middle" dominant-baseline="middle" fill="#FBFAF7">YOU</text>`;
   groups.forEach((g,gi)=>{
@@ -230,7 +251,7 @@ function orbitSVG(){
         const x=C+R[ring]*Math.cos(a), y=C+R[ring]*Math.sin(a);
         const dim = state.filter!=='all'&&!p.groups.includes(state.filter);
         s+=`<g class="node ${dim?'dim':''}" onclick="openPerson(${p.id})">
-          <circle class="face" cx="${x}" cy="${y}" r="15" fill="#FBFAF7" stroke="#111110" stroke-width="1"/>
+          <circle class="face" cx="${x}" cy="${y}" r="15" fill="${state.colour?mix(gc(p),.2):'#FBFAF7'}" stroke="${state.colour?gc(p):'#111110'}" stroke-width="1"/>
           <text class="ini" x="${x}" y="${y+.5}" font-size="9" font-family="Archivo Black, sans-serif" text-anchor="middle" dominant-baseline="middle" fill="#111110">${ini(p)}</text>
           ${p.due?`<circle cx="${x+11}" cy="${y-11}" r="3.6" fill="#111110" stroke="#F3F2EE" stroke-width="1.5"/>`:''}
           <text x="${x}" y="${y+26}" font-size="8" text-anchor="middle" fill="#8C8B86">${p.first.toUpperCase()}</text></g>`;
@@ -240,13 +261,13 @@ function orbitSVG(){
   return s+`</svg>`;
 }
 
-const row = (p,i,right='') => `<button class="ent" onclick="openPerson(${p.id})"><span class="n">${pad(i)}</span><div class="ph">${ini(p)}</div><div style="min-width:0"><b>${p.first} ${p.last}</b><small>${p.role} / ${p.team}</small></div>${right}</button>`;
+const row = (p,i,right='') => `<button class="ent" onclick="openPerson(${p.id})"><span class="n">${pad(i)}</span><div class="ph" style="background:${tint(p)}">${ini(p)}</div><div style="min-width:0"><b>${p.first} ${p.last}</b><small>${p.role} / ${p.team}</small></div>${right}</button>`;
 
 const views = {
 orbit(){
   const due=people.filter(p=>p.due), fol=people.filter(p=>p.follow);
   return `
-  <div class="bar mono"><span>Wed 25 Nov</span><span class="grey">Rolo / Orbit</span></div>
+  <div class="bar mono"><span>Wed 25 Nov</span><button class="grey" onclick="go('settings')">Settings</button></div>
   <div class="stats">
     <button onclick="go('index')"><b>${pad(people.length)}</b><span class="mono grey">People</span></button>
     <button onclick="go('drill')"><b>${pad(due.length)}</b><span class="mono grey">Due to drill</span></button>
@@ -254,7 +275,7 @@ orbit(){
   </div>
   <div class="orbitwrap">
     <div>
-      <div class="filters" style="border-top:0"><button class="${state.filter==='all'?'on':''}" onclick="state.filter='all';render()">All</button>${groups.map(g=>`<button class="${state.filter===g.id?'on':''}" onclick="state.filter='${g.id}';render()">${g.short}</button>`).join('')}</div>
+      <div class="filters" style="border-top:0"><button class="${state.filter==='all'?'on':''}" onclick="state.filter='all';render()">All</button>${groups.map(g=>`<button class="${state.filter===g.id?'on':''}" onclick="state.filter='${g.id}';render()">${sw(g)}${g.short}</button>`).join('')}</div>
       ${orbitSVG()}
       <div class="legend mono grey"><span><i class="lg-due"></i>Due to drill</span><span><i class="lg-ring"></i>Inner ring = closer</span></div>
     </div>
@@ -282,7 +303,7 @@ person(){
   <div class="bar mono"><button onclick="go('index')">← Index</button><span class="grey">Entry ${pad(idx)}</span></div>
   <div class="profile" style="border-top:0">
     <div>
-      <div class="portrait">${ini(p)}</div>
+      <div class="portrait" style="background:${tint(p)}">${ini(p)}</div>
       <div class="pname">${p.first}<br>${p.last}</div>
       <div class="facts">
         <div><span>Role</span><span>${p.role}</span></div>
@@ -311,7 +332,7 @@ drill(){
     <div class="prog">${deck.map((_,k)=>`<i class="${k<i?'done':''}"></i>`).join('')}</div>
     <div class="flip ${state.fc.flipped?'on':''}" onclick="state.fc.flipped=!state.fc.flipped;this.classList.toggle('on')">
       <div class="flip-in">
-        <div class="fa"><div class="foot mono" style="border-top:0;border-bottom:1px solid #444"><span>${pad(people.indexOf(p)+1)}: Who?</span><span>${G(p.groups[0]).short}</span></div><div class="big">${ini(p)}</div><div class="foot mono" style="border-color:#444"><span>Tap to reveal</span><span>↻</span></div></div>
+        <div class="fa" style="background:${deep(p)}"><div class="foot mono" style="border-top:0;border-bottom:1px solid #444"><span>${pad(people.indexOf(p)+1)}: Who?</span><span>${G(p.groups[0]).short}</span></div><div class="big">${ini(p)}</div><div class="foot mono" style="border-color:#444"><span>Tap to reveal</span><span>↻</span></div></div>
         <div class="fb"><div class="pname">${p.first}<br>${p.last}</div>
           <div class="facts"><div><span>Role</span><span>${p.role}</span></div><div><span>Team</span><span>${p.team}</span></div><div><span>Met</span><span>${p.met}</span></div></div>
           <div class="hk"><span class="mono grey" style="display:block;margin-bottom:4px">Memory hook</span>${p.hook}</div></div>
@@ -324,9 +345,23 @@ groups(){
   return `<div class="bar mono"><span>Rolo / Groups</span><span class="grey">${pad(groups.length)} groups</span></div>
   <div class="title">Groups</div>
   <div style="border-top:1px solid var(--ink)">
-  ${groups.map((g,i)=>`<button class="gl" onclick="state.filter='${g.id}';go('index')"><span class="mono grey">${pad(i+1)}</span><b>${g.name}</b><span class="ct">${pad(inG(g.id).length)}</span></button>`).join('')}
+  ${groups.map((g,i)=>`<button class="gl" onclick="state.filter='${g.id}';go('index')"><span class="mono grey">${pad(i+1)}</span><b>${sw(g)}${g.name}</b><span class="ct">${pad(inG(g.id).length)}</span></button>`).join('')}
   <button class="gl" onclick="openGroup()"><span class="mono grey">+</span><b class="grey">New group</b><span></span></button></div>`;
 },
+};
+views.settings = function(){
+  const tog=(on,fn)=>`<button class="tog ${on?'on':''}" onclick="${fn}" role="switch" aria-checked="${on}"><i></i></button>`;
+  return `<div class="bar mono"><span>Rolo / Settings</span><span class="grey">v0.1</span></div>
+  <div class="title">Settings</div>
+  <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Appearance</span></div>
+  <div class="set"><div><b>Colour mode</b><small>Give each group its own colour across the orbit, index and drill. Off = black and white.</small></div>${tog(state.colour,`setColour(${!state.colour})`)}</div>
+  <div class="set"><div><b>Preview</b><small>${groups.map(g=>`<span class="tagline" style="margin:6px 6px 0 0;display:inline-flex;align-items:center;gap:6px">${state.colour?`<i class="sw" style="background:${g.c};margin:0"></i>`:''}${g.short}</span>`).join('')}</small></div></div>
+  <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Account &amp; sync</span></div>
+  <div class="set"><div><b>Signed in</b><small>Synced across your devices · Last sync just now</small></div><span class="mono grey">●&nbsp;Live</span></div>
+  <div class="set"><div><b>Sign-in method</b><small>To be confirmed</small></div><span class="mono grey">→</span></div>
+  <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
+  <div class="set"><div><b>Export backup</b><small>Download everyone and their notes as a file</small></div><span class="mono grey">↓</span></div>
+  <div class="set"><div><b>Sign out</b></div><span class="mono grey">→</span></div>`;
 };
 function nextCard(){ state.fc.i++; state.fc.flipped=false; render() }
 
