@@ -1,0 +1,8 @@
+{
+  "name": "Rolo",
+  "short_name": "Rolo",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F4EFE6",
+  "theme_color": "#F4EFE6"
+}
