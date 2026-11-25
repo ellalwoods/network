@@ -1,5 +1,5 @@
 'use strict';
-/* Rolo: a personal network app.
+/* Network (internally "rolo"): a personal network app.
    Data is stored on the device (IndexedDB) and, when signed in, synced to Supabase
    through the rolo_* functions (see supabase/rolo.sql). The login itself is never sent:
    only a SHA-256 hash of "rolo:" + the normalised login leaves the device. */
@@ -158,7 +158,7 @@ function renderNav(){
   const v = ui.view === 'person' || ui.view === 'cards' ? 'people' : ui.view;
   const sw = g => colourOn() ? `<i class="sw" style="background:${gHex(g)}"></i>` : '';
   $('#side').innerHTML =
-    `<div class="brand">Rolo<span id="syncdot" data-s="${sync.state}" title="Sync status"></span></div>` +
+    `<div class="brand">Network<span id="syncdot" data-s="${sync.state}" title="Sync status"></span></div>` +
     NAV.map(([k,l],i) => `<button class="navbtn ${v===k?'on':''}" onclick="go('${k}')"><span>${l}</span><span>0${i+1}</span></button>`).join('') +
     `<div class="mono grey" style="padding:22px 20px 8px">Groups</div>` +
     D.groups.map(g => `<button class="grp" onclick="ui.filter='${g.id}';go('people')"><span>${sw(g)}${esc(g.name)}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
@@ -244,7 +244,7 @@ const fromDateInput = (v, fallback) => { if(!v) return fallback; const [y,m,d] =
 /* ---------- orbit ---------- */
 views.orbit = () => {
   const fol = D.people.filter(p => p.follow), recent = [...D.log].sort((a,b) => b.t - a.t).slice(0,5);
-  const head = `<div class="bar mono"><span>Rolo / Orbit</span><button class="grey" onclick="go('settings')">Settings</button></div>`;
+  const head = `<div class="bar mono"><span>Network / Orbit</span><button class="grey" onclick="go('settings')">Settings</button></div>`;
   if(!D.people.length) return head + `<div class="title">Orbit</div><div class="empty"><p>Once you’ve added people, they’ll orbit around you here, grouped by context and placed closer the better you know them.</p><div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add a person</button></div></div>`;
   return head + `
   <div class="stats">
@@ -345,7 +345,7 @@ function logListHTML(){
 views.log = () => {
   const fol = D.people.filter(p => p.follow);
   return `
-  <div class="bar mono"><span>Rolo / Log</span><span class="grey">${pad(D.log.length)} entries</span></div>
+  <div class="bar mono"><span>Network / Log</span><span class="grey">${pad(D.log.length)} entries</span></div>
   <div class="title">Log</div>
   <button class="composer" onclick="openEntrySheet()"><span class="grey">What happened? Who did you meet?</span><span class="mono">+ New entry</span></button>
   ${fol.length ? `<details class="folds" ${ui.folOpen?'open':''} ontoggle="ui.folOpen=this.open"><summary class="sect mono"><span>Open follow-ups · ${fol.length}</span><span class="grey">Show ▾</span></summary>
@@ -390,14 +390,14 @@ views.person = () => {
       <div class="sect mono"><span>Log</span><span class="grey">${pad(entries.length)}</span></div>
       <form class="inline note-add" onsubmit="quickEntry(event,'${p.id}')"><input name="t" placeholder="Log something about ${esc(p.first||'them')}…" autocomplete="off"><button class="mono">Add</button><button type="button" class="mono grey" onclick="openEntrySheet(null,'${p.id}',this.form.t.value)">More</button></form>
       ${entries.map(e => entryHTML(e, {except:p.id})).join('')}
-      ${p.created ? `<div class="entry auto"><span class="mono grey e-date">${esc(dayLabel(p.created))}</span><div class="e-body"><p class="grey">Added to Rolo${p.met?` · met at ${esc(p.met)}`:''}</p></div></div>` : ''}
+      ${p.created ? `<div class="entry auto"><span class="mono grey e-date">${esc(dayLabel(p.created))}</span><div class="e-body"><p class="grey">Added to Network${p.met?` · met at ${esc(p.met)}`:''}</p></div></div>` : ''}
     </div>
   </div>`;
 };
 
 /* ---------- groups ---------- */
 views.groups = () => `
-  <div class="bar mono"><span>Rolo / Groups</span><span class="grey">${pad(D.groups.length)} groups</span></div>
+  <div class="bar mono"><span>Network / Groups</span><span class="grey">${pad(D.groups.length)} groups</span></div>
   <div class="title">Groups</div>
   <p class="intro grey">Make a group for any context: a cohort, a team, an event. One person can be in as many groups as you like.</p>
   <div style="border-top:1px solid var(--ink)">
@@ -452,7 +452,7 @@ views.settings = () => {
     sync.last ? `Synced across your devices · last sync ${new Date(sync.last).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'})}` : 'Synced across your devices';
   const samples = D.people.filter(p => p.sample).length;
   return `
-  <div class="bar mono"><span>Rolo / Settings</span><span class="grey">v1.0</span></div>
+  <div class="bar mono"><span>Network / Settings</span><span class="grey">v1.0</span></div>
   <div class="title">Settings</div>
   <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Appearance</span></div>
   <div class="set"><div><b>Colour mode</b><small>Give each group its own colour across your people, log, orbit and flashcards. Off = black and white.</small></div>${tog(col,'setColour('+!col+')')}</div>
@@ -468,7 +468,7 @@ views.settings = () => {
     : `<button class="set" style="width:100%" onclick="startLogin('signin')"><div><b>Sign in to sync</b><small>Name + planet + constellation</small></div><span class="mono grey">→</span></button>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
   <button class="set" style="width:100%" onclick="exportData()"><div><b>Export backup</b><small>Download everyone, notes and photos as a file</small></div><span class="mono grey">↓</span></button>
-  <label class="set" style="cursor:pointer"><div><b>Import backup</b><small>Merge a Rolo backup file into this orbit</small></div><span class="mono grey">↑</span><input type="file" accept="application/json,.json" hidden onchange="importData(this)"></label>
+  <label class="set" style="cursor:pointer"><div><b>Import backup</b><small>Merge a Network backup file into this orbit</small></div><span class="mono grey">↑</span><input type="file" accept="application/json,.json" hidden onchange="importData(this)"></label>
   ${samples ? `<button class="set" style="width:100%" onclick="removeSamples()"><div><b>Remove sample people</b><small>${samples} sample ${samples===1?'person':'people'}</small></div><span class="mono grey">×</span></button>` : ''}
   <p class="intro grey" style="padding-top:20px;padding-bottom:40px">To install: on iPhone, tap Share → Add to Home Screen. On a laptop, use the install icon in the address bar.</p>`;
 };
@@ -483,7 +483,7 @@ function pickLogin(k,v){ ui.login[k] = v; ui.login.msg = ''; render() }
 const loginReady = () => ui.login.name.trim() && ui.login.planet && ui.login.con;
 views.login = () => {
   const L = ui.login, change = L.mode === 'change';
-  return `<div class="bar mono"><span>Rolo / ${change?'Change login':'Sign in'}</span><button class="grey" onclick="skipLogin()">${change?'Cancel':'Not now'}</button></div>
+  return `<div class="bar mono"><span>Network / ${change?'Change login':'Sign in'}</span><button class="grey" onclick="skipLogin()">${change?'Cancel':'Not now'}</button></div>
   <div class="title">${change?'New<br>combination':'Who’s in<br>orbit?'}</div>
   <div class="loginwrap">
   <label class="fld" style="border-top:1px solid var(--ink)"><span class="mono grey">01 / Your name</span><input id="lname" value="${esc(L.name)}" placeholder="Ella" autocomplete="off" autocapitalize="words" oninput="ui.login.name=this.value;document.getElementById('enter').disabled=!loginReady()"></label>
@@ -499,7 +499,7 @@ views.login = () => {
 function skipLogin(){ localStorage.setItem('rolo-skip-login','1'); go(ui.login.mode==='change'?'settings':'people') }
 async function submitLogin(){
   const L = ui.login; if(!loginReady() || L.busy) return;
-  if(!SYNC_ON){ L.msg = 'Sync isn’t set up in this copy of the app yet. Tap “Not now” to keep using Rolo on this device.'; return render() }
+  if(!SYNC_ON){ L.msg = 'Sync isn’t set up in this copy of the app yet. Tap “Not now” to keep using Network on this device.'; return render() }
   const label = `${titleCase(L.name)} · ${L.planet} · ${L.con}`;
   const key = await sha(`rolo:${norm(L.name)}|${L.planet.toLowerCase()}|${L.con.toLowerCase()}`);
   L.busy = true; L.msg = ''; render();
@@ -686,7 +686,7 @@ function deleteGroup(id){
 /* ---------- data ---------- */
 async function exportData(){
   const blob = new Blob([JSON.stringify({app:'rolo', v:1, exported:new Date().toISOString(), data:D, photos:PH})], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `rolo-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `network-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 async function importData(input){
@@ -695,7 +695,7 @@ async function importData(input){
     D = merge(D, j.data);
     for(const [id,l] of Object.entries(j.photos||{})) if(!PH[id] || PH[id].t < l.t){ PH[id] = l; await idb.set('ph:'+id, l) }
     commit(); toast('Backup imported');
-  }catch(e){ toast('That isn’t a Rolo backup file') }
+  }catch(e){ toast('That isn’t a Network backup file') }
 }
 function loadSamples(){
   const mk = (name, pc) => D.groups.find(g => norm(g.name) === norm(name)) || newGroup(name, pc);

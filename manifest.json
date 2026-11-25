@@ -1,6 +1,6 @@
 {
-  "name": "Rolo",
-  "short_name": "Rolo",
+  "name": "Network",
+  "short_name": "Network",
   "description": "Remember the people in your professional network.",
   "start_url": "./",
   "scope": "./",

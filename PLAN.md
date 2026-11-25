@@ -1,4 +1,4 @@
-# Rolo: a personal network app
+# Network: a personal app for your professional network
 
 Rolo is a personal app for remembering the people you meet at work. It is a website you can add to your phone's home screen, and it also works properly on a laptop.
 

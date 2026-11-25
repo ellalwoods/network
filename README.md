@@ -1,6 +1,6 @@
-# Rolo
+# Network
 
-Rolo is a personal app for remembering the people you meet at work. It's a static web app (plain JavaScript, no build step) that you can add to your phone's home screen and also use on a laptop.
+Network is a personal app for remembering the people you meet at work. It's a static web app (plain JavaScript, no build step) that you can add to your phone's home screen and also use on a laptop.
 
 - **People (home):** a notebook of everyone you've met.
   - Browse A–Z, by most recent, by team or by group, as a list or a grid.
@@ -26,7 +26,7 @@ Sign-in works the same way as Duo Logo and DuoVino: **name + planet + constellat
 
 ### One-time setup
 
-1. **Database:** open the Supabase project that Duo Logo and DuoVino use, go to the **SQL editor**, and run [`supabase/rolo.sql`](supabase/rolo.sql). It creates Rolo's own tables (`rolo_accounts` and `rolo_photos`) and functions (`rolo_*`), separate from the other apps. The tables have row-level security turned on with no policies, so nothing can reach them except through those functions.
+1. **Database:** open the Supabase project that Duo Logo and DuoVino use, go to the **SQL editor**, and run [`supabase/rolo.sql`](supabase/rolo.sql). It creates its own tables (`rolo_accounts` and `rolo_photos`) and functions (`rolo_*`), separate from the other apps. The tables have row-level security turned on with no policies, so nothing can reach them except through those functions.
 2. **Connect the app:** in [`config.js`](config.js), paste the project URL and the anon (publishable) key. These are the same values your other apps use, and you'll also find them under Supabase → Project Settings → API. The anon key is meant to be public.
 3. **Host it:** turn on GitHub Pages for this repo (Settings → Pages → deploy from a branch → the branch with these files, root folder).
 4. **Install it:**
