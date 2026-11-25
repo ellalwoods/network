@@ -150,6 +150,11 @@ main{min-width:0;padding:0 0 96px}
 .tog.on i{transform:translateX(22px);background:var(--white)}
 .sw{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle}
 .filters button.on .sw{outline:1px solid var(--white)}
+.swatches{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:212px;flex:none}
+.swb{width:20px;height:20px;border-radius:50%}
+.swb.on{outline:1.5px solid var(--ink);outline-offset:2px}
+.swl{width:36px;height:36px;border-radius:50%;position:relative;overflow:hidden;flex:none;border:1px solid var(--soft)}
+.swl input{position:absolute;inset:-6px;opacity:0;cursor:pointer}
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(17,17,16,.25);display:none;z-index:30;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
@@ -177,12 +182,26 @@ main{min-width:0;padding:0 0 96px}
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 
 <script>
-const groups = [
-  {id:'cohort',  name:'Clerkship cohort', short:'Cohort',  c:'#5B7DB1'},
-  {id:'partners',name:'Partners',         short:'Partners',c:'#C2913A'},
-  {id:'disputes',name:'Disputes team',    short:'Disputes',c:'#5F9472'},
-  {id:'mentors', name:'Mentors',          short:'Mentors', c:'#9A6FA0'},
+// Firm palette: one colour per Big Six firm (plus two alternates). Hexes are approximations; edit in Settings.
+const palette = [
+  {id:'kwm',     firm:'King & Wood Mallesons', name:'Periwinkle',     hex:'#7E86D6'},
+  {id:'kwm2',    firm:'King & Wood Mallesons', name:'Blackcurrant',   hex:'#3E2147'},
+  {id:'apc',     firm:'Ashurst Perkins Coie',  name:'Liberty green',  hex:'#4E9A87'},
+  {id:'ash',     firm:'Ashurst (prior)',       name:'Orange',         hex:'#E07A2F'},
+  {id:'allens',  firm:'Allens',                name:'Magenta',        hex:'#B4246F'},
+  {id:'hsf',     firm:'HSF Kramer',            name:'Slate teal',     hex:'#2F6B7C'},
+  {id:'cu',      firm:'Clayton Utz',           name:'Navy',           hex:'#22385E'},
+  {id:'minter',  firm:'MinterEllison',         name:'Rose',           hex:'#C9577A'},
 ];
+const P = id => palette.find(x=>x.id===id);
+(JSON.parse(localStorage.getItem('rolo-palette')||'[]')).forEach(([id,h])=>{ if(P(id)) P(id).hex=h });
+const groups = [
+  {id:'cohort',  name:'Clerkship cohort', short:'Cohort',  pc:'kwm'},
+  {id:'partners',name:'Partners',         short:'Partners',pc:'apc'},
+  {id:'disputes',name:'Disputes team',    short:'Disputes',pc:'ash'},
+  {id:'mentors', name:'Mentors',          short:'Mentors', pc:'allens'},
+];
+groups.forEach(g=>Object.defineProperty(g,'c',{get(){return P(g.pc).hex}}));
 // ring: 1 = inner (close), 2 = middle, 3 = outer (acquaintance)
 const people = [
   {id:1,first:'Priya',last:'Nair',role:'Senior Associate',team:'Disputes',groups:['disputes','mentors'],ring:1,due:true,met:'Clerkship wk 2, team lunch',hook:'Training for the Sydney marathon',follow:'Thank-you note',notes:[['03 Nov','Offered to review my research memo. Follow up after exams.'],['20 Oct','Grew up in Perth. Loves bouldering.']]},
@@ -209,6 +228,8 @@ const tint = p => state.colour ? gc(p)+'33' : 'var(--faint)';
 const mix = (hex,t) => '#'+[1,3,5].map(i=>Math.round(parseInt(hex.substr(i,2),16)*t+[0xF3,0xF2,0xEE][(i-1)/2]*(1-t)).toString(16).padStart(2,'0')).join('');
 const deep = p => state.colour ? gc(p) : 'var(--ink)';
 const sw = g => state.colour ? `<i class="sw" style="background:${g.c}"></i>` : '';
+function setHex(id,h){ P(id).hex=h; localStorage.setItem('rolo-palette',JSON.stringify(palette.map(x=>[x.id,x.hex]))); render() }
+function setGroupColour(gid,pid){ groups.find(g=>g.id===gid).pc=pid; render() }
 function setColour(on){ state.colour=on; localStorage.setItem('rolo-colour',on?'1':'0'); render() }
 
 let state = {colour: localStorage.getItem('rolo-colour')==='1', view:'orbit', filter:'all', q:'', person:null, fc:{i:0,flipped:false,deck:'all'}};
@@ -356,6 +377,10 @@ views.settings = function(){
   <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Appearance</span></div>
   <div class="set"><div><b>Colour mode</b><small>Give each group its own colour across the orbit, index and drill. Off = black and white.</small></div>${tog(state.colour,`setColour(${!state.colour})`)}</div>
   <div class="set"><div><b>Preview</b><small>${groups.map(g=>`<span class="tagline" style="margin:6px 6px 0 0;display:inline-flex;align-items:center;gap:6px">${state.colour?`<i class="sw" style="background:${g.c};margin:0"></i>`:''}${g.short}</span>`).join('')}</small></div></div>
+  ${state.colour?`<div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Group colours</span><span class="grey">Tap a swatch</span></div>
+  ${groups.map(g=>`<div class="set"><div><b>${g.name}</b><small>${P(g.pc).firm} · ${P(g.pc).name}</small></div><div class="swatches">${palette.map(x=>`<button class="swb ${g.pc===x.id?'on':''}" style="background:${x.hex}" title="${x.firm} ${x.name}" onclick="setGroupColour('${g.id}','${x.id}')"></button>`).join('')}</div></div>`).join('')}
+  <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Firm palette</span><span class="grey">Tap to fine-tune</span></div>
+  ${palette.map(x=>`<label class="set" style="cursor:pointer"><div><b>${x.firm}</b><small>${x.name} · ${x.hex.toUpperCase()}</small></div><span class="swl" style="background:${x.hex}"><input type="color" value="${x.hex}" onchange="setHex('${x.id}',this.value)"></span></label>`).join('')}`:''}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Account &amp; sync</span></div>
   <div class="set"><div><b>Signed in</b><small>Synced across your devices · Last sync just now</small></div><span class="mono grey">●&nbsp;Live</span></div>
   <div class="set"><div><b>Sign-in method</b><small>To be confirmed</small></div><span class="mono grey">→</span></div>
@@ -379,6 +404,7 @@ function openAdd(){
 function openGroup(){
   sheet(`<div class="title">New<br>group</div>
   <label class="fld"><span class="mono grey">Name</span><input placeholder="Summer clerkship 2026"></label>
+  <div class="fld"><span class="mono grey">Colour (used in colour mode)</span><div class="swatches" style="margin-top:10px">${palette.map((x,i)=>`<button class="swb ${i===0?'on':''}" style="background:${x.hex}" title="${x.firm} ${x.name}" onclick="this.parentNode.querySelectorAll('.swb').forEach(b=>b.classList.remove('on'));this.classList.add('on')"></button>`).join('')}</div></div>
   <div class="sheetbtns"><button onclick="closeSheet()">Cancel</button><button onclick="closeSheet()">Create →</button></div>`);
 }
 function sheet(h){ document.getElementById('sheet').innerHTML=h; document.getElementById('scrim').classList.add('on') }
