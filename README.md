@@ -2,10 +2,14 @@
 
 Rolo is a personal app for remembering the people you meet at work. It's a static web app (plain JavaScript, no build step) that you can add to your phone's home screen and also use on a laptop.
 
+- **People (home):** a notebook of everyone you've met.
+  - Browse A–Z, by most recent, by team or by group, as a list or a grid.
+  - Search covers everything you've written.
+  - Each person has a page with their photo, details, memory hook and follow-up, and you can flip to the previous or next person.
+- **Log:** a dated diary of what happened and who was there. One entry can tag several people, and it also shows on each of their pages.
 - **Orbit:** your network as a map with you at the centre. People are grouped by context and sit closer the better you know them.
-- **Index:** a numbered, searchable list of everyone. Search also covers notes and memory hooks.
-- **Drill:** flashcards that use face → name, with spaced repetition so the people you forget come up more often.
 - **Groups:** custom groups (a cohort, a team, an event), and a person can be in several.
+- **Flashcards:** a simple flip-through deck of faces and names (no scoring), opened from People or a group.
 - **Settings:**
   - Black-and-white or colour mode, using colours from the Big Six law firms.
   - Sync and sign-in.

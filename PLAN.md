@@ -47,11 +47,13 @@ Rolo is a personal app for remembering the people you meet at work. It is a webs
 
 ## Steps
 1. ✅ Clickable mockup, design direction and plan.
-2. ✅ v1 app:
-   - Orbit, Index, person pages (photo, notes, follow-ups), Groups, Drill with spaced repetition and Settings
-   - Black-and-white and colour modes
-   - Device storage, sign-in and sync with Supabase, backup export and import
+2. ✅ v1 app, built around the people notebook:
+   - People (A–Z, recent, team or group; list or grid; search; previous/next on person pages)
+   - Log diary (entries can tag several people)
+   - Orbit map and Groups
+   - Simple flashcards (no spaced repetition)
+   - Settings: black-and-white and colour modes, sign-in and sync, backup export and import
    - Installable on the home screen, with offline support
-3. Connect Supabase: run `supabase/rolo.sql`, fill in `config.js` and turn on GitHub Pages.
-4. Use it for a week, then refine.
-   - Ideas: quick add at events, reverse flashcards, "haven't spoken in a while" nudges, a team or seniority view, Clayton Utz and MinterEllison colours.
+3. Connect Supabase (done in `config.js`) and run `supabase/rolo.sql`, then turn on GitHub Pages.
+4. Use it for a while, then refine.
+   - Ideas: quick add at events, "haven't spoken in a while" nudges, Clayton Utz and MinterEllison colours.

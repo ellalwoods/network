@@ -21,7 +21,6 @@ const PLANETS = [['Mercury',3],['Venus',5],['Earth',5.5],['Mars',4],['Jupiter',1
 const CONS = ['Crux','Orion','Lyra','Cygnus','Carina','Centaurus','Scorpius','Pegasus'];
 const CON_PTS = [[[17,3],[17,22],[9,11],[25,11],[21,18]],[[9,4],[25,5],[14,13],[17,13],[20,13],[10,22],[24,21]],[[17,4],[13,12],[21,12],[12,21],[22,21]],[[17,3],[17,23],[7,9],[27,9],[17,13]],[[5,18],[12,14],[19,15],[26,8],[29,20]],[[6,6],[12,12],[18,10],[24,16],[28,22],[16,21]],[[6,5],[11,9],[15,14],[19,19],[24,21],[29,17]],[[8,6],[26,6],[8,20],[26,20],[3,12]]];
 const RINGS = ['Inner','Middle','Outer'];
-const INTERVALS = [0,1,3,7,14,30,60];   // days between reviews, by box
 const DAY = 864e5;
 const NOGROUP = '#B5B3AC';
 
@@ -61,12 +60,13 @@ const idb = (() => {
 })();
 
 /* ---------- state ---------- */
-const blank = () => ({v:1, people:[], groups:[], deleted:{}, settings:{colour:false,u:0}});
+const blank = () => ({v:1, people:[], groups:[], log:[], deleted:{}, settings:{colour:false,u:0}});
 let D = blank();          // synced document
 let PH = {};              // person id -> {d: dataURL|null, t: updated ms}
 let acct = null;          // {label, key}; label stays on this device only
 const sync = {state: SYNC_ON ? 'idle' : 'off', last: 0, err: ''};
-const ui = {view:'orbit', filter:'all', q:'', person:null, fc:null,
+const ui = {view:'people', filter:'all', q:'', lq:'', person:null, fc:null, cardDeck:'all', navList:null, psel:new Set(), pq:'',
+            sort: localStorage.getItem('rolo-sort') || 'az', layout: localStorage.getItem('rolo-layout') || 'list',
             login:{name:'', planet:null, con:null, mode:'signin', busy:false, msg:'', pending:null},
             sel:new Set(), ring:3, photo:undefined, gcolour:'kwm'};
 
@@ -77,7 +77,6 @@ const pal = id => PALETTE.find(x => x.id === id) || PALETTE[0];
 const gHex = g => g ? pal(g.pc).hex : NOGROUP;
 const pHex = p => gHex(G((p.groups||[]).find(id => G(id))));
 const inG = gid => D.people.filter(p => (p.groups||[]).includes(gid));
-const isDue = p => !p.srs || p.srs.due <= now();
 const touch = x => { x.u = now(); return x };
 
 function commit(){ idb.set('data', D); render(); schedulePush() }
@@ -111,7 +110,7 @@ function mergeList(a, b, del){
 function merge(L, R){
   const del = {...(R.deleted||{})};
   for(const [k,v] of Object.entries(L.deleted||{})) del[k] = Math.max(v, del[k]||0);
-  return {v:1, deleted:del, people:mergeList(L.people,R.people,del), groups:mergeList(L.groups,R.groups,del),
+  return {v:1, deleted:del, people:mergeList(L.people,R.people,del), groups:mergeList(L.groups,R.groups,del), log:mergeList(L.log,R.log,del),
           settings: ((R.settings&&R.settings.u)||0) > ((L.settings&&L.settings.u)||0) ? R.settings : (L.settings||blank().settings)};
 }
 
@@ -150,24 +149,24 @@ async function syncNow(){
 function paintSync(){ const el = $('#syncdot'); if(el) el.dataset.s = sync.state }
 
 /* ---------- navigation ---------- */
-const NAV = [['orbit','Orbit'],['index','Index'],['drill','Drill'],['groups','Groups']];
-function go(v){ ui.view = v; if(v === 'drill') ui.fc = null; render(); window.scrollTo(0,0) }
+const NAV = [['people','People'],['log','Log'],['orbit','Orbit'],['groups','Groups']];
+function go(v){ ui.view = v; render(); window.scrollTo(0,0) }
 function openPerson(id){ ui.person = id; go('person') }
 function setFilter(f){ ui.filter = f; render() }
 
 function renderNav(){
-  const v = ui.view === 'person' ? 'index' : ui.view;
+  const v = ui.view === 'person' || ui.view === 'cards' ? 'people' : ui.view;
   const sw = g => colourOn() ? `<i class="sw" style="background:${gHex(g)}"></i>` : '';
   $('#side').innerHTML =
     `<div class="brand">Rolo<span id="syncdot" data-s="${sync.state}" title="Sync status"></span></div>` +
     NAV.map(([k,l],i) => `<button class="navbtn ${v===k?'on':''}" onclick="go('${k}')"><span>${l}</span><span>0${i+1}</span></button>`).join('') +
     `<div class="mono grey" style="padding:22px 20px 8px">Groups</div>` +
-    D.groups.map(g => `<button class="grp" onclick="ui.filter='${g.id}';go('index')"><span>${sw(g)}${esc(g.name)}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
+    D.groups.map(g => `<button class="grp" onclick="ui.filter='${g.id}';go('people')"><span>${sw(g)}${esc(g.name)}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
     `<button class="grp grey" onclick="openGroupSheet()"><span>+ New group</span><span></span></button>` +
     `<button class="navbtn ${v==='settings'?'on':''}" style="margin-top:auto;border-top:1px solid var(--soft)" onclick="go('settings')"><span>Settings</span><span>05</span></button>` +
-    `<button class="newbtn" onclick="openPersonSheet()">+ New person</button>`;
+    `<button class="newbtn" onclick="openAdd()">+ Add</button>`;
   $('#tabbar').innerHTML = NAV.map(([k,l]) => `<button class="${v===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('') +
-    `<button class="add" onclick="openPersonSheet()" aria-label="Add person">+</button>`;
+    `<button class="add" onclick="openAdd()" aria-label="Add">+</button>`;
   $('#tabbar').style.display = ui.view === 'login' ? 'none' : '';
 }
 
@@ -222,7 +221,6 @@ function orbitSVG(){
         face = `<image href="${d}" x="${x-rr}" y="${y-rr}" width="${rr*2}" height="${rr*2}" clip-path="url(#c${p.id})" preserveAspectRatio="xMidYMid slice" opacity="${ring===3?.7:1}"/><circle cx="${x}" cy="${y}" r="${rr}" fill="none" stroke="${stroke}" stroke-width="${col?(ring===1?2.4:1.6):1}"/>`;
       } else face = `<circle class="face" cx="${x}" cy="${y}" r="${rr}" fill="${fill}" stroke="${stroke}" stroke-width="${col?1.2:1}"/><text class="ini" x="${x}" y="${y+.5}" font-size="${(rr*.6).toFixed(1)}" font-family="Archivo Black, sans-serif" text-anchor="middle" dominant-baseline="middle" fill="${txt}">${esc(ini(p))}</text>`;
       body += `<g class="node ${dim?'dim':''}" onclick="openPerson('${p.id}')"><title>${esc(fullName(p))}</title>${face}
-        ${isDue(p) ? `<circle cx="${x+rr*.72}" cy="${y-rr*.72}" r="3.6" fill="#111110" stroke="#F3F2EE" stroke-width="1.5"/>` : ''}
         ${rr >= 11 ? `<text x="${x}" y="${y+rr+11}" font-size="8" text-anchor="middle" fill="#8C8B86">${esc((p.first||'').toUpperCase().slice(0,12))}</text>` : ''}</g>`;
     });
   }));
@@ -232,123 +230,199 @@ function orbitSVG(){
 /* ---------- views ---------- */
 const views = {};
 
+/* ---------- people helpers ---------- */
+const entriesFor = pid => D.log.filter(e => (e.people||[]).includes(pid)).sort((a,b) => b.t - a.t);
+function lastEntryMap(){ const m = {}; for(const e of D.log) for(const pid of e.people||[]) if(!m[pid] || m[pid].t < e.t) m[pid] = e; return m }
+const lastAct = (p, m) => Math.max(p.created||0, (m[p.id]||{}).t||0);
+const monthName = t => new Date(t).toLocaleDateString('en-AU',{month:'long',year:'numeric'});
+const dayLabel = t => new Date(t).toLocaleDateString('en-AU',{weekday:'short',day:'2-digit',month:'short'});
+const rel = t => { const d = Math.floor((startOfDay(now()) - startOfDay(t))/DAY); return d <= 0 ? 'Today' : d === 1 ? 'Yesterday' : d < 7 ? `${d} days ago` : fmtDate(t) };
+const startOfDay = t => { const d = new Date(t); d.setHours(0,0,0,0); return d.getTime() };
+const dateInput = t => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` };
+const fromDateInput = (v, fallback) => { if(!v) return fallback; const [y,m,d] = v.split('-').map(Number); const t = new Date(y,m-1,d,12).getTime(); return startOfDay(t) === startOfDay(now()) ? now() : t };
+
+/* ---------- orbit ---------- */
 views.orbit = () => {
-  const due = D.people.filter(isDue), fol = D.people.filter(p => p.follow);
-  const head = `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>`;
-  if(!D.people.length) return head + `
-    <div class="title">Your<br>orbit</div>
-    <div class="empty">
-      <p>This is where everyone you meet will orbit around you, grouped by context and placed closer the better you know them.</p>
-      <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
-      <button class="link mono" onclick="loadSamples()">Or explore with sample people →</button>
-    </div>`;
-  const tag = p => colourOn() ? `style="background:${tones(pHex(p)).wash};border-color:${tones(pHex(p)).deep};color:${tones(pHex(p)).deep}"` : '';
+  const fol = D.people.filter(p => p.follow), recent = [...D.log].sort((a,b) => b.t - a.t).slice(0,5);
+  const head = `<div class="bar mono"><span>Rolo / Orbit</span><button class="grey" onclick="go('settings')">Settings</button></div>`;
+  if(!D.people.length) return head + `<div class="title">Orbit</div><div class="empty"><p>Once you’ve added people, they’ll orbit around you here, grouped by context and placed closer the better you know them.</p><div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add a person</button></div></div>`;
   return head + `
   <div class="stats">
-    <button onclick="go('index')"><b>${pad(D.people.length)}</b><span class="mono grey">People</span></button>
-    <button onclick="go('drill')"><b>${pad(due.length)}</b><span class="mono grey">Due to drill</span></button>
-    <button onclick="document.getElementById('fol')?.scrollIntoView({behavior:'smooth'})"><b>${pad(fol.length)}</b><span class="mono grey">Follow-ups</span></button>
+    <button onclick="go('people')"><b>${pad(D.people.length)}</b><span class="mono grey">People</span></button>
+    <button onclick="go('groups')"><b>${pad(D.groups.length)}</b><span class="mono grey">Groups</span></button>
+    <button onclick="go('log')"><b>${pad(D.log.length)}</b><span class="mono grey">Log entries</span></button>
   </div>
   <div class="orbitwrap">
     <div>
       ${groupFilters(ui.filter,'setFilter').replace('class="filters"','class="filters" style="border-top:0"')}
       ${orbitSVG()}
-      <div class="legend mono grey"><span><i class="lg-due"></i>Due to drill</span><span><i class="lg-ring"></i>Inner ring = closer</span>${colourOn()?'<span><i class="lg-ring" style="border:0;background:linear-gradient(90deg,#AF005F,#F3D9E6)"></i>Brighter = closer</span>':''}</div>
+      <div class="legend mono grey"><span><i class="lg-ring"></i>Inner ring = closer</span>${colourOn()?'<span><i class="lg-ring" style="border:0;background:linear-gradient(90deg,#AF005F,#F3D9E6)"></i>Brighter = closer</span>':''}<span>Tap a name to open</span></div>
     </div>
     <div>
-      <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Due to drill</span>${due.length?`<button class="grey" onclick="go('drill')">Start →</button>`:''}</div>
-      ${due.slice(0,6).map((p,i) => row(p,i+1)).join('') || `<p class="emptyrow grey">All caught up.</p>`}
-      ${due.length > 6 ? `<button class="sect mono grey" style="width:100%" onclick="go('drill')"><span>+ ${due.length-6} more</span><span>→</span></button>` : ''}
-      <div id="fol" class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Follow-ups</span><span class="grey">${pad(fol.length)}</span></div>
-      ${fol.map((p,i) => row(p,i+1,`<span class="tagline" ${tag(p)}>${esc(p.follow)}</span>`)).join('') || `<p class="emptyrow grey">No follow-ups. Add one from someone’s page.</p>`}
+      <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Latest in the log</span><button class="grey" onclick="go('log')">All →</button></div>
+      ${recent.map(e => entryHTML(e, {compact:true})).join('') || `<p class="emptyrow grey">Nothing logged yet.</p>`}
+      ${fol.length ? `<div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Follow-ups</span><span class="grey">${pad(fol.length)}</span></div>
+      ${fol.map((p,i) => row(p,i+1,`<span class="tagline" ${tagStyle(p)}>${esc(p.follow)}</span>`)).join('')}` : ''}
     </div>
   </div>`;
 };
+const tagStyle = p => colourOn() ? `style="background:${tones(pHex(p)).wash};border-color:${tones(pHex(p)).deep};color:${tones(pHex(p)).deep}"` : '';
 
+/* ---------- people (the notebook) ---------- */
+const SORTS = [['az','A–Z'],['recent','Recent'],['team','Team'],['group','Group']];
+function setSort(s){ ui.sort = s; localStorage.setItem('rolo-sort', s); render() }
+function setLayout(l){ ui.layout = l; localStorage.setItem('rolo-layout', l); render() }
 function filteredPeople(){
-  const q = norm(ui.q);
-  return D.people.filter(p => (ui.filter==='all' || (p.groups||[]).includes(ui.filter)) &&
-      (!q || norm([p.first,p.last,p.team,p.role,p.hook,p.met,p.follow,...(p.notes||[]).map(n=>n.text),...(p.groups||[]).map(id=>G(id)?.name)].join(' ')).includes(q)))
-    .sort((a,b) => fullName(a).localeCompare(fullName(b)));
+  const q = norm(ui.q), m = lastEntryMap();
+  const text = p => norm([p.first,p.last,p.team,p.role,p.hook,p.met,p.follow,p.email,...entriesFor(p.id).map(e=>e.text),...(p.groups||[]).map(id=>G(id)?.name)].join(' '));
+  const list = D.people.filter(p => (ui.filter==='all' || (p.groups||[]).includes(ui.filter)) && (!q || text(p).includes(q)));
+  return ui.sort === 'recent' ? list.sort((a,b) => lastAct(b,m) - lastAct(a,m)) : list.sort((a,b) => fullName(a).localeCompare(fullName(b)));
 }
-const listHTML = () => { const l = filteredPeople(); return l.map(p => row(p, p.n||0, p.follow?`<span class="tagline">Follow up</span>`:'')).join('') ||
-  `<p class="emptyrow grey">${D.people.length ? 'No one matches.' : 'No one here yet.'}</p>` };
-views.index = () => `
-  <div class="bar mono"><span>Rolo / Index</span><span class="grey">${pad(filteredPeople().length)} entries</span></div>
-  <div class="title">Index</div>
+function sections(list){
+  const m = lastEntryMap(), out = new Map(), add = (k,p) => { if(!out.has(k)) out.set(k,[]); out.get(k).push(p) };
+  if(ui.sort === 'az') list.forEach(p => add(((p.first||p.last||'#')[0]||'#').toUpperCase().replace(/[^A-Z]/,'#'), p));
+  else if(ui.sort === 'recent') list.forEach(p => { const d = (startOfDay(now()) - startOfDay(lastAct(p,m)))/DAY; add(d < 7 ? 'This week' : d < 31 ? 'This month' : d < 365 ? 'This year' : 'Earlier', p) });
+  else if(ui.sort === 'team'){ list.forEach(p => add(p.team || 'No team', p)); return new Map([...out].sort((a,b) => a[0]==='No team' ? 1 : b[0]==='No team' ? -1 : a[0].localeCompare(b[0]))) }
+  else { D.groups.forEach(g => list.filter(p => (p.groups||[]).includes(g.id)).forEach(p => add(g.name, p))); list.filter(p => !(p.groups||[]).some(id => G(id))).forEach(p => add('No group', p)) }
+  return out;
+}
+function personRow(p, m){
+  const e = m[p.id];
+  return `<button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small>
+    ${e ? `<span class="snip"><span class="mono grey">${esc(rel(e.t))}</span> ${esc(e.text.slice(0,90))}</span>` : p.met ? `<span class="snip"><span class="mono grey">Met</span> ${esc(p.met)}</span>` : ''}</div>
+    ${p.follow ? `<span class="tagline" ${tagStyle(p)}>Follow up</span>` : ''}</button>`;
+}
+function personCard(p){
+  return `<button class="pcard" onclick="openPerson('${p.id}')">${faceBox(p,'pc-face')}<b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small></button>`;
+}
+function listHTML(){
+  const list = filteredPeople(), m = lastEntryMap();
+  ui.navList = list.map(p => p.id);
+  if(!list.length) return `<p class="emptyrow grey">${D.people.length ? 'No one matches.' : 'No one here yet.'}</p>`;
+  // keep it calm: A–Z and Recent only get section headers once the list is long enough to need them
+  const flat = (ui.sort === 'az' && list.length <= 14) || (ui.layout === 'grid' && (ui.sort === 'az' || ui.sort === 'recent'));
+  if(flat) return ui.layout === 'grid' ? `<div class="pgrid">${list.map(personCard).join('')}</div>` : list.map(p => personRow(p, m)).join('');
+  const secs = sections(list);
+  const jump = ui.sort === 'az' && list.length > 8 ? `<div class="jump">${[...secs.keys()].map(k => `<button class="mono" onclick="document.getElementById('sec-${k}').scrollIntoView({behavior:'smooth'})">${k}</button>`).join('')}</div>` : '';
+  return jump + [...secs].map(([k,ps]) => `<div class="sec-h mono" id="sec-${esc(k.replace(/\s/g,'_'))}"><span>${esc(k)}</span>${ui.sort==='az'?'':`<span class="grey">${pad(ps.length)}</span>`}</div>` +
+    (ui.layout === 'grid' ? `<div class="pgrid">${ps.map(personCard).join('')}</div>` : ps.map(p => personRow(p, m)).join(''))).join('');
+}
+views.people = () => {
+  const fol = D.people.filter(p => p.follow).length;
+  if(!D.people.length) return `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>
+    <div class="title">Your<br>people</div>
+    <div class="empty"><p>A notebook of everyone you meet: who they are, where you met, and what you talked about. Add someone, then log what happens.</p>
+      <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
+      <button class="link mono" onclick="loadSamples()">Or explore with sample people →</button></div>`;
+  return `
+  <div class="bar mono"><span>${today()}</span><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
+  <div class="title">People</div>
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
-  <div class="search"><span class="mono grey">Search</span><input id="q" value="${esc(ui.q)}" placeholder="Name, team, or a detail" oninput="ui.q=this.value;document.getElementById('list').innerHTML=listHTML()" autocomplete="off"></div>
+  <div class="search"><span class="mono grey">Search</span><input id="q" value="${esc(ui.q)}" placeholder="Name, team, or anything you wrote" oninput="ui.q=this.value;document.getElementById('list').innerHTML=listHTML()" autocomplete="off"></div>
+  <div class="toolbar"><div class="seg">${SORTS.map(([k,l]) => `<button class="${ui.sort===k?'on':''}" onclick="setSort('${k}')">${l}</button>`).join('')}</div>
+    <div class="seg">${[['list','List'],['grid','Grid']].map(([k,l]) => `<button class="${ui.layout===k?'on':''}" onclick="setLayout('${k}')">${l}</button>`).join('')}</div></div>
   <div id="list">${listHTML()}</div>`;
+};
 
+/* ---------- log (the diary) ---------- */
+function entryHTML(e, o={}){
+  const ps = (e.people||[]).map(P).filter(Boolean);
+  const chips = ps.filter(p => p.id !== o.except).map(p => `<button class="pchip" onclick="event.stopPropagation();openPerson('${p.id}')">${faceBox(p,'mini')}${esc(p.first||fullName(p))}</button>`).join('');
+  return `<div class="entry ${o.compact?'compact':''}" onclick="openEntrySheet('${e.id}')"><span class="mono grey e-date">${o.compact ? esc(rel(e.t)) : esc(dayLabel(e.t))}</span>
+    <div class="e-body"><p>${esc(e.text)}</p>${chips ? `<div class="pchips">${chips}</div>` : ''}</div></div>`;
+}
+function filteredLog(){
+  const q = norm(ui.lq||'');
+  return D.log.filter(e => (ui.filter==='all' || (e.people||[]).some(id => (P(id)?.groups||[]).includes(ui.filter))) &&
+    (!q || norm(e.text + ' ' + (e.people||[]).map(id => P(id) ? fullName(P(id)) : '').join(' ')).includes(q))).sort((a,b) => b.t - a.t);
+}
+function logListHTML(){
+  const l = filteredLog(); if(!l.length) return `<p class="emptyrow grey">${D.log.length ? 'No entries match.' : 'Nothing logged yet. Write down who you met and what you talked about.'}</p>`;
+  let out = '', cur = '';
+  for(const e of l){ const mth = monthName(e.t); if(mth !== cur){ cur = mth; out += `<div class="sec-h mono"><span>${esc(mth)}</span></div>` } out += entryHTML(e) }
+  return out;
+}
+views.log = () => {
+  const fol = D.people.filter(p => p.follow);
+  return `
+  <div class="bar mono"><span>Rolo / Log</span><span class="grey">${pad(D.log.length)} entries</span></div>
+  <div class="title">Log</div>
+  <button class="composer" onclick="openEntrySheet()"><span class="grey">What happened? Who did you meet?</span><span class="mono">+ New entry</span></button>
+  ${fol.length ? `<details class="folds" ${ui.folOpen?'open':''} ontoggle="ui.folOpen=this.open"><summary class="sect mono"><span>Open follow-ups · ${fol.length}</span><span class="grey">Show ▾</span></summary>
+    ${fol.map((p,i) => row(p,i+1,`<span class="tagline" ${tagStyle(p)}>${esc(p.follow)}</span>`)).join('')}</details>` : ''}
+  ${groupFilters(ui.filter,'setFilter')}
+  <div class="search"><span class="mono grey">Search</span><input id="lq" value="${esc(ui.lq||'')}" placeholder="Search the log" oninput="ui.lq=this.value;document.getElementById('loglist').innerHTML=logListHTML()" autocomplete="off"></div>
+  <div id="loglist">${logListHTML()}</div>`;
+};
+
+/* ---------- person page ---------- */
 views.person = () => {
-  const p = P(ui.person); if(!p){ ui.view='index'; return views.index() }
+  const p = P(ui.person); if(!p){ ui.view='people'; return views.people() }
   const t = tones(pHex(p)), col = colourOn();
-  const wash = col ? `style="background:${t.wash}"` : '';
+  const nav = (ui.navList && ui.navList.includes(p.id)) ? ui.navList : D.people.slice().sort((a,b)=>fullName(a).localeCompare(fullName(b))).map(x=>x.id);
+  const i = nav.indexOf(p.id), prev = nav[i-1], next = nav[i+1];
   const fact = (k,v) => v ? `<div><span>${k}</span><span>${v}</span></div>` : '';
   const link = (u,l) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`;
   const li = p.linkedin ? (/^https?:\/\//.test(p.linkedin) ? p.linkedin : 'https://'+p.linkedin) : '';
+  const entries = entriesFor(p.id);
   return `
-  <div class="bar mono"><button onclick="go('index')">← Index</button><button class="grey" onclick="openPersonSheet('${p.id}')">Edit</button></div>
+  <div class="bar mono"><button onclick="go('people')">← People</button>
+    <span class="pager"><button ${prev?`onclick="openPerson('${prev}')"`:'disabled'} aria-label="Previous person">‹</button><span class="grey">${i+1} / ${nav.length}</span><button ${next?`onclick="openPerson('${next}')"`:'disabled'} aria-label="Next person">›</button></span>
+    <button class="grey" onclick="openPersonSheet('${p.id}')">Edit</button></div>
   <div class="profile" style="border-top:0">
     <div>
       ${faceBox(p,'portrait')}
       <div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
       <div class="facts">
         ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact('Met',esc(p.met))}
-        ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('index')">${esc(g.name)}</button>`).join(', '))}
+        ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('people')">${esc(g.name)}</button>`).join(', '))}
         ${fact('Email',p.email?link('mailto:'+p.email,p.email):'')}${fact('Phone',p.phone?link('tel:'+p.phone,p.phone):'')}${fact('LinkedIn',li?link(li,'Profile ↗'):'')}
-        <div><span>Orbit</span><span class="rings">${RINGS.map((l,i)=>`<button class="${(p.ring||3)===i+1?'on':''}" onclick="setRing('${p.id}',${i+1})">${l}</button>`).join('')}</span></div>
-        <div><span>Recall</span><span class="mono">${p.srs ? `${'●'.repeat(Math.min(p.srs.box,6))}${'○'.repeat(6-Math.min(p.srs.box,6))} · ${isDue(p)?'due now':'next '+fmtDate(p.srs.due)}` : 'Not drilled yet'}</span></div>
+        <div><span>Orbit</span><span class="rings">${RINGS.map((l,k)=>`<button class="${(p.ring||3)===k+1?'on':''}" onclick="setRing('${p.id}',${k+1})">${l}</button>`).join('')}</span></div>
+        ${fact('Added', p.created ? esc(dayLabel(p.created)) : '')}
       </div>
     </div>
     <div>
-      <div class="hook" ${wash}><span class="mono grey">Memory hook</span><p>${p.hook ? esc(p.hook) : `<button class="grey" onclick="openPersonSheet('${p.id}','hook')">+ Add something to remember them by</button>`}</p></div>
+      <div class="hook" ${col?`style="background:${t.wash}"`:''}><span class="mono grey">Memory hook</span><p>${p.hook ? esc(p.hook) : `<button class="grey" onclick="openPersonSheet('${p.id}','hook')">+ Add something to remember them by</button>`}</p></div>
       <div class="hook"><span class="mono grey">Follow-up</span>
         ${p.follow ? `<p>${esc(p.follow)}</p><button class="btn small" style="margin-top:12px" onclick="doneFollow('${p.id}')">✓ Done</button>`
           : `<form class="inline" onsubmit="setFollow(event,'${p.id}')"><input name="f" placeholder="e.g. Coffee in December" autocomplete="off"><button class="mono">Set</button></form>`}
       </div>
-      <div class="sect mono"><span>Notes</span><span class="grey">${pad((p.notes||[]).length)}</span></div>
-      <form class="inline note-add" onsubmit="addNote(event,'${p.id}')"><input name="t" placeholder="Add a note: something they mentioned…" autocomplete="off"><button class="mono">Add</button></form>
-      ${(p.notes||[]).slice().sort((a,b)=>b.t-a.t).map(n => `<div class="note"><span class="mono grey">${fmtDate(n.t)}</span><span>${esc(n.text)}</span><button class="x" title="Delete note" onclick="delNote('${p.id}','${n.id}')">×</button></div>`).join('')}
+      <div class="sect mono"><span>Log</span><span class="grey">${pad(entries.length)}</span></div>
+      <form class="inline note-add" onsubmit="quickEntry(event,'${p.id}')"><input name="t" placeholder="Log something about ${esc(p.first||'them')}…" autocomplete="off"><button class="mono">Add</button><button type="button" class="mono grey" onclick="openEntrySheet(null,'${p.id}',this.form.t.value)">More</button></form>
+      ${entries.map(e => entryHTML(e, {except:p.id})).join('')}
+      ${p.created ? `<div class="entry auto"><span class="mono grey e-date">${esc(dayLabel(p.created))}</span><div class="e-body"><p class="grey">Added to Rolo${p.met?` · met at ${esc(p.met)}`:''}</p></div></div>` : ''}
     </div>
   </div>`;
 };
 
+/* ---------- groups ---------- */
 views.groups = () => `
   <div class="bar mono"><span>Rolo / Groups</span><span class="grey">${pad(D.groups.length)} groups</span></div>
   <div class="title">Groups</div>
   <p class="intro grey">Make a group for any context: a cohort, a team, an event. One person can be in as many groups as you like.</p>
   <div style="border-top:1px solid var(--ink)">
   ${D.groups.map((g,i) => { const h = gHex(g); return `<div class="glrow" style="${colourOn()?`box-shadow:inset 6px 0 0 ${h};background:linear-gradient(90deg,${tones(h).wash},transparent 70%)`:''}">
-      <button class="gl" onclick="ui.filter='${g.id}';go('index')"><span class="mono grey">${pad(i+1)}</span><b>${esc(g.name)}</b><span class="ct">${pad(inG(g.id).length)}</span></button>
-      <button class="mono grey gedit" onclick="openGroupSheet('${g.id}')">Edit</button></div>` }).join('')}
+      <button class="gl" onclick="ui.filter='${g.id}';go('people')"><span class="mono grey">${pad(i+1)}</span><b>${esc(g.name)}</b><span class="ct">${pad(inG(g.id).length)}</span></button>
+      <button class="mono grey gedit" onclick="startCards('${g.id}')">Cards</button><button class="mono grey gedit" onclick="openGroupSheet('${g.id}')">Edit</button></div>` }).join('')}
   <button class="gl" onclick="openGroupSheet()"><span class="mono grey">+</span><b class="grey">New group</b><span></span></button></div>`;
 
-/* ---------- drill (spaced repetition) ---------- */
+/* ---------- flashcards (simple flip-through, no scoring) ---------- */
+function startCards(deck){ ui.fc = null; ui.cardDeck = deck || 'all'; go('cards') }
 function buildDeck(deck){
-  let ps = deck === 'due' ? D.people.filter(isDue) : deck === 'all' ? [...D.people] : inG(deck);
+  let ps = deck === 'all' || !G(deck) ? [...D.people] : inG(deck);
   ps = ps.map(p => [Math.random(), p.id]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
-  ui.fc = {deck, queue:ps, i:0, flipped:false, requeued:new Set(), got:0};
+  ui.fc = {deck, queue:ps, i:0, flipped:false};
 }
 function setDeck(d){ buildDeck(d); render() }
-function rate(r){
-  const f = ui.fc, p = P(f.queue[f.i]); if(!p) return;
-  const s = p.srs || {box:0, due:0};
-  if(r === 0){ s.box = 1; s.due = now() + DAY; if(!f.requeued.has(p.id)){ f.queue.push(p.id); f.requeued.add(p.id) } }
-  else if(r === 1){ s.box = Math.max(1, s.box); s.due = now() + INTERVALS[s.box]*DAY*.6 }
-  else { s.box = Math.min(s.box+1, 6); s.due = now() + INTERVALS[s.box]*DAY; f.got++ }
-  p.srs = s; touch(p);
-  f.i++; f.flipped = false; idb.set('data', D); schedulePush(); render();
-}
-views.drill = () => {
-  if(!ui.fc) buildDeck(D.people.some(isDue) ? 'due' : 'all');
+function cardStep(n){ const f = ui.fc; f.i = Math.max(0, Math.min(f.queue.length, f.i + n)); f.flipped = false; render() }
+views.cards = () => {
+  if(!ui.fc) buildDeck(ui.cardDeck || 'all');
   const f = ui.fc, q = f.queue;
-  const head = `<div class="bar mono"><span>Rolo / Drill</span><span class="grey">${String(Math.min(f.i+1,q.length)).padStart(2,'0')}/${String(q.length).padStart(2,'0')}</span></div>
-    <div class="filters" style="border-top:0"><button class="${f.deck==='due'?'on':''}" onclick="setDeck('due')">Due</button><button class="${f.deck==='all'?'on':''}" onclick="setDeck('all')">Everyone</button>${D.groups.map(g=>`<button class="${f.deck===g.id?'on':''}" onclick="setDeck('${g.id}')">${esc(g.short||g.name)}</button>`).join('')}</div>`;
-  if(!D.people.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">Nobody<br>yet.</div><p class="grey" style="margin-bottom:24px">Add people with a photo and you can drill their faces here.</p><button class="btn" onclick="openPersonSheet()">+ Add person</button></div>`;
-  if(!q.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">All<br>clear.</div><p class="grey" style="margin-bottom:24px">Nobody in this deck is due. Drill everyone anyway?</p><button class="btn" onclick="setDeck('all')">Drill everyone →</button></div>`;
-  if(f.i >= q.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">Done.</div><p class="mono grey" style="margin-bottom:24px">${pad(f.got)} remembered · ${pad(new Set(q).size)} reviewed</p><button class="btn" onclick="setDeck('${f.deck}')">Again →</button></div>`;
-  const p = P(q[f.i]); if(!p){ f.i++; return views.drill() }
+  const head = `<div class="bar mono"><button onclick="go('people')">← People</button><span class="grey">${String(Math.min(f.i+1,q.length)).padStart(2,'0')}/${String(q.length).padStart(2,'0')}</span></div>
+    <div class="filters" style="border-top:0"><button class="${f.deck==='all'?'on':''}" onclick="setDeck('all')">Everyone</button>${D.groups.map(g=>`<button class="${f.deck===g.id?'on':''}" onclick="setDeck('${g.id}')">${esc(g.short||g.name)}</button>`).join('')}</div>`;
+  if(!q.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">No<br>cards.</div><p class="grey" style="margin-bottom:24px">Add people (ideally with a photo) to flip through them here.</p><button class="btn" onclick="openPersonSheet()">+ Add person</button></div>`;
+  if(f.i >= q.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">That’s<br>everyone.</div><p class="mono grey" style="margin-bottom:24px">${pad(q.length)} cards</p><div class="btnrow"><button class="btn" onclick="setDeck('${f.deck}')">Shuffle again →</button><button class="btn ghost" onclick="go('people')">Back to people</button></div></div>`;
+  const p = P(q[f.i]); if(!p){ f.i++; return views.cards() }
   const t = tones(pHex(p)), col = colourOn(), d = photoOf(p);
   const g = G((p.groups||[]).find(id=>G(id)));
   const front = d ? `<div class="big photo-big"><img src="${d}" alt=""></div>` :
@@ -357,13 +431,13 @@ views.drill = () => {
     <div class="prog">${q.map((_,k)=>`<i class="${k<f.i?'done':''}"></i>`).join('')}</div>
     <div class="flip ${f.flipped?'on':''}" onclick="ui.fc.flipped=!ui.fc.flipped;this.classList.toggle('on')">
       <div class="flip-in">
-        <div class="fa" style="${col?`background:${t.base};color:${onC(t.base)}`:''}"><div class="foot mono" style="border-top:0;border-bottom:1px solid currentColor;opacity:.85"><span>${pad(p.n||0)}: Who?</span><span>${esc(g?(g.short||g.name):'')}</span></div>${front}<div class="foot mono" style="opacity:.85"><span>Tap to reveal</span><span>↻</span></div></div>
+        <div class="fa" style="${col?`background:${t.base};color:${onC(t.base)}`:''}"><div class="foot mono" style="border-top:0;border-bottom:1px solid currentColor;opacity:.85"><span>Who’s this?</span><span>${esc(g?(g.short||g.name):'')}</span></div>${front}<div class="foot mono" style="opacity:.85"><span>Tap to flip</span><span>↻</span></div></div>
         <div class="fb" ${col?`style="background:${t.wash}"`:''}><div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
           <div class="facts">${p.role?`<div><span>Role</span><span>${esc(p.role)}</span></div>`:''}${p.team?`<div><span>Team</span><span>${esc(p.team)}</span></div>`:''}${p.met?`<div><span>Met</span><span>${esc(p.met)}</span></div>`:''}</div>
           ${p.hook?`<div class="hk"><span class="mono grey" style="display:block;margin-bottom:4px">Memory hook</span>${esc(p.hook)}</div>`:''}</div>
       </div>
     </div>
-    <div class="rate"><button onclick="rate(0)">Forgot</button><button onclick="rate(1)">Almost</button><button onclick="rate(2)">Got it</button></div>
+    <div class="rate"><button onclick="cardStep(-1)" ${f.i===0?'disabled':''}>← Back</button><button onclick="openPerson('${p.id}')">Open page</button><button onclick="cardStep(1)">Next →</button></div>
   </div>`;
 };
 
@@ -381,7 +455,7 @@ views.settings = () => {
   <div class="bar mono"><span>Rolo / Settings</span><span class="grey">v1.0</span></div>
   <div class="title">Settings</div>
   <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Appearance</span></div>
-  <div class="set"><div><b>Colour mode</b><small>Give each group its own colour across the orbit, index and drill. Off = black and white.</small></div>${tog(col,'setColour('+!col+')')}</div>
+  <div class="set"><div><b>Colour mode</b><small>Give each group its own colour across your people, log, orbit and flashcards. Off = black and white.</small></div>${tog(col,'setColour('+!col+')')}</div>
   ${col ? `<div class="set" style="display:block"><b>Tones</b><small>Each colour comes in a faded, soft, bright and deep version. Brighter means closer on your orbit.</small>
     ${D.groups.map(g=>{const t=tones(gHex(g));return `<div class="ramp"><span class="mono grey">${esc(g.short||g.name)}</span>${[t.wash,t.soft,t.base,t.deep].map(c=>`<i style="background:${c}"></i>`).join('')}</div>`}).join('') || '<p class="grey" style="margin-top:8px">Create a group to see its tones.</p>'}</div>
   ${D.groups.length ? `<div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Group colours</span><span class="grey">Tap a swatch</span></div>
@@ -422,7 +496,7 @@ views.login = () => {
   <p class="loginnote">Capitals and spaces in your name don’t matter. ${change?'Your people stay exactly as they are.':'New combination? You’ll be asked to start a new orbit, and anything already on this device comes with you.'} Remember your combination: it can’t be recovered.</p>
   </div>`;
 };
-function skipLogin(){ localStorage.setItem('rolo-skip-login','1'); go(ui.login.mode==='change'?'settings':'orbit') }
+function skipLogin(){ localStorage.setItem('rolo-skip-login','1'); go(ui.login.mode==='change'?'settings':'people') }
 async function submitLogin(){
   const L = ui.login; if(!loginReady() || L.busy) return;
   if(!SYNC_ON){ L.msg = 'Sync isn’t set up in this copy of the app yet. Tap “Not now” to keep using Rolo on this device.'; return render() }
@@ -443,7 +517,7 @@ async function submitLogin(){
     } else {
       const remote = await rpc('rolo_load',{p_key:key});
       if(remote){ acct = {label,key}; await idb.set('acct',acct); D = merge(D, remote); await idb.set('data',D);
-        L.busy = false; toast('Welcome back'); go('orbit'); syncNow(); return }
+        L.busy = false; toast('Welcome back'); go('people'); syncNow(); return }
       L.pending = {label, key}; L.busy = false; render();
       return sheet(`<div class="title">New<br>orbit?</div>
         <p class="intro" style="padding-top:0">There’s no orbit for <b>${esc(label)}</b> yet.${D.people.length?` The ${D.people.length} ${D.people.length===1?'person':'people'} on this device will come with you.`:''}</p>
@@ -459,7 +533,7 @@ async function submitLogin(){
 }
 async function confirmNewOrbit(){
   closeSheet(); acct = ui.login.pending; ui.login.pending = null;
-  await idb.set('acct', acct); toast('New orbit created'); go('orbit'); syncNow();
+  await idb.set('acct', acct); toast('New orbit created'); go('people'); syncNow();
 }
 function confirmSwitch(){
   sheet(`<div class="title">Switch<br>account?</div>
@@ -473,13 +547,48 @@ async function switchAccount(){
   Object.assign(ui.login, {name:'', planet:null, con:null}); startLogin('signin');
 }
 
-/* ---------- person actions ---------- */
+/* ---------- person + log actions ---------- */
 function setRing(id, r){ const p = P(id); p.ring = r; touch(p); commit() }
-function addNote(e, id){ e.preventDefault(); const v = e.target.t.value.trim(); if(!v) return; const p = P(id);
-  (p.notes = p.notes || []).push({id:uid(), t:now(), text:v}); touch(p); commit(); }
-function delNote(pid, nid){ const p = P(pid); p.notes = (p.notes||[]).filter(n => n.id !== nid); touch(p); commit() }
 function setFollow(e, id){ e.preventDefault(); const v = e.target.f.value.trim(); if(!v) return; const p = P(id); p.follow = v; touch(p); commit() }
-function doneFollow(id){ const p = P(id); (p.notes = p.notes||[]).push({id:uid(), t:now(), text:'✓ '+p.follow}); p.follow = ''; touch(p); commit(); toast('Follow-up done') }
+function doneFollow(id){ const p = P(id); D.log.push(touch({id:uid(), t:now(), people:[id], text:'✓ Followed up: '+p.follow})); p.follow = ''; touch(p); commit(); toast('Follow-up done and logged') }
+function quickEntry(e, pid){ e.preventDefault(); const v = e.target.t.value.trim(); if(!v) return; D.log.push(touch({id:uid(), t:now(), people:[pid], text:v})); commit(); toast('Logged') }
+
+function pickerHTML(){
+  const q = norm(ui.pq||''), chosen = [...ui.psel].map(P).filter(Boolean);
+  const matches = q ? D.people.filter(p => !ui.psel.has(p.id) && norm(fullName(p)+' '+(p.team||'')).includes(q)).slice(0,6) : [];
+  return `${chosen.map(p => `<button type="button" class="pchip on" onclick="togglePsel('${p.id}')">${faceBox(p,'mini')}${esc(fullName(p))} ×</button>`).join('')}
+    <input id="pq" value="${esc(ui.pq||'')}" placeholder="${chosen.length?'+ Add another person':'Type a name…'}" autocomplete="off" oninput="ui.pq=this.value;refreshPicker(true)" onkeydown="if(event.key==='Enter'){event.preventDefault();const b=document.querySelector('#pmatches button');if(b)b.click()}">
+    <div id="pmatches">${matches.map(p => `<button type="button" class="pchip" onclick="togglePsel('${p.id}')">${faceBox(p,'mini')}${esc(fullName(p))}${p.team?` <span class="grey">· ${esc(p.team)}</span>`:''}</button>`).join('')}
+    ${q && !matches.length ? `<span class="grey" style="font-size:13px">No one called “${esc(ui.pq)}”. Add them as a person first.</span>` : ''}</div>`;
+}
+function refreshPicker(keepFocus){ $('#picker').innerHTML = pickerHTML(); if(keepFocus){ const i = $('#pq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length) } }
+function togglePsel(id){ ui.psel.has(id) ? ui.psel.delete(id) : ui.psel.add(id); ui.pq = ''; refreshPicker(true) }
+function openEntrySheet(id, pid, text){
+  const e = id ? D.log.find(x => x.id === id) : null;
+  ui.psel = new Set(e ? e.people||[] : pid ? [pid] : []); ui.pq = '';
+  sheet(`<form onsubmit="saveEntry(event,${e?`'${e.id}'`:'null'})"><div class="title">${e?'Edit<br>entry':'New<br>entry'}</div>
+    <label class="fld"><span class="mono grey">Date</span><input type="date" name="d" value="${dateInput(e ? e.t : now())}" max="${dateInput(now()+365*DAY)}"></label>
+    <label class="fld"><span class="mono grey">What happened</span><textarea name="text" rows="4" placeholder="Coffee with Priya: she’s training for the marathon, offered to review my memo…" required>${esc(e ? e.text : text||'')}</textarea></label>
+    <div class="fld"><span class="mono grey">Who was there</span><div class="picker" id="picker">${pickerHTML()}</div></div>
+    ${e?`<button type="button" class="link mono danger" style="margin:14px 20px 0" onclick="deleteEntry('${e.id}')">Delete entry</button>`:''}
+    <div class="sheetbtns"><button type="button" onclick="closeSheet()">Cancel</button><button type="submit">Save →</button></div></form>`);
+  if(!e) setTimeout(() => $('#sheet [name=text]').focus(), 50);
+}
+function saveEntry(ev, id){
+  ev.preventDefault(); const f = new FormData(ev.target), text = (f.get('text')||'').toString().trim(); if(!text) return;
+  let e = id ? D.log.find(x => x.id === id) : null;
+  if(!e){ e = {id:uid()}; D.log.push(e) }
+  Object.assign(e, {text, people:[...ui.psel], t: fromDateInput(f.get('d'), e.t || now())}); touch(e);
+  closeSheet(); commit(); toast(id ? 'Entry saved' : 'Logged');
+}
+function deleteEntry(id){ D.log = D.log.filter(e => e.id !== id); D.deleted[id] = now(); closeSheet(); commit(); toast('Entry deleted') }
+function openAdd(){
+  sheet(`<div class="title">Add</div>
+    <button class="set" style="width:100%" onclick="closeSheet();openPersonSheet()"><div><b>New person</b><small>Someone you’ve met: photo, role, team, where you met</small></div><span class="mono grey">→</span></button>
+    <button class="set" style="width:100%" onclick="closeSheet();openEntrySheet(null, ui.view==='person'?ui.person:null)"><div><b>Log entry</b><small>A coffee, a meeting, an event, and who was there</small></div><span class="mono grey">→</span></button>
+    <button class="set" style="width:100%" onclick="closeSheet();openGroupSheet()"><div><b>New group</b><small>A cohort, a team, an event</small></div><span class="mono grey">→</span></button>
+    <div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet()">Cancel</button></div>`);
+}
 
 function chipsHTML(){
   return D.groups.map(g => `<button type="button" class="opt ${ui.sel.has(g.id)?'on':''}" onclick="toggleSel('${g.id}')">${colourOn()?`<i class="sw" style="background:${gHex(g)}"></i>`:''}${esc(g.short||g.name)}</button>`).join('') +
@@ -530,7 +639,7 @@ async function pickPhoto(input){
 function savePerson(e, id){
   e.preventDefault(); const f = new FormData(e.target), val = k => (f.get(k)||'').toString().trim();
   let p = id ? P(id) : null;
-  if(!p){ p = {id:uid(), n:Math.max(0,...D.people.map(x=>x.n||0))+1, notes:[], created:now()}; D.people.push(p) }
+  if(!p){ p = {id:uid(), n:Math.max(0,...D.people.map(x=>x.n||0))+1, created:now()}; D.people.push(p) }
   Object.assign(p, {first:val('first'), last:val('last'), role:val('role'), team:val('team'), met:val('met'), hook:val('hook'), follow:val('follow'),
                     email:val('email'), phone:val('phone'), linkedin:val('linkedin'), groups:[...ui.sel], ring:ui.ring});
   delete p.sample; touch(p);
@@ -544,8 +653,9 @@ function confirmDelete(id){
 }
 function deletePerson(id){
   D.people = D.people.filter(p => p.id !== id); D.deleted[id] = now();
+  D.log.forEach(e => { if((e.people||[]).includes(id)){ e.people = e.people.filter(x => x !== id); touch(e) } });
   if(PH[id]) setPhoto(id, null);
-  closeSheet(); ui.view = 'index'; commit(); toast('Deleted');
+  closeSheet(); ui.view = 'people'; commit(); toast('Deleted');
 }
 
 /* ---------- group actions ---------- */
@@ -604,7 +714,15 @@ function loadSamples(){
     ['Amara','Okafor','Partner','Corporate',[gP],2,'Partner Q&A panel','Started as a paralegal']];
   let n = Math.max(0, ...D.people.map(x=>x.n||0));
   S.forEach(([first,last,role,team,gs,ring,met,hook,follow]) => D.people.push(touch({id:uid(), n:++n, first, last, role, team, groups:gs.map(g=>g.id), ring, met, hook, follow:follow||'', notes:[], sample:true,
-    srs: Math.random() < .6 ? {box:2, due:now()+3*DAY} : undefined})));
+    created: now() - Math.floor(Math.random()*40)*DAY})));
+  const by = f => D.people.find(p => p.sample && p.first === f)?.id;
+  [[1,'Priya','Coffee near the office. She offered to review my research memo once exams are done.'],
+   [3,'Priya,Daniel','Disputes team lunch. Daniel’s cat is called Brief (!). Priya is training for the Sydney marathon.'],
+   [6,'Tom','Welcome drinks. Grad program rotates every 6 months; banking team is hiring next year.'],
+   [9,'Mei,Jack,Ravi,Hannah','Orientation day. Mei is also Monash; Jack plays bass in a band; Ravi is a huge F1 fan.'],
+   [12,'Sophie,Grace','Women in Law breakfast. Sophie did an LLM in Paris and is happy to chat about competition law.'],
+   [20,'Liam','Practice talk on class actions. Ask about the London secondment.']]
+   .forEach(([d,names,text]) => D.log.push(touch({id:uid(), t:now()-d*DAY, people:names.split(',').map(by).filter(Boolean), text, sample:true})));
   [gC,gP,gD,gM].forEach(g => g.sample = true);
   commit(); toast('Sample people added');
 }
@@ -612,7 +730,8 @@ function removeSamples(){
   const t = now();
   D.people.filter(p => p.sample).forEach(p => D.deleted[p.id] = t);
   D.groups.filter(g => g.sample && !D.people.some(p => !p.sample && (p.groups||[]).includes(g.id))).forEach(g => D.deleted[g.id] = t);
-  D.people = D.people.filter(p => !p.sample); D.groups = D.groups.filter(g => !D.deleted[g.id]);
+  D.log.filter(e => e.sample).forEach(e => D.deleted[e.id] = t);
+  D.people = D.people.filter(p => !p.sample); D.groups = D.groups.filter(g => !D.deleted[g.id]); D.log = D.log.filter(e => !e.sample);
   if(ui.filter !== 'all' && !G(ui.filter)) ui.filter = 'all';
   commit(); toast('Sample people removed');
 }
@@ -626,7 +745,7 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add
 /* ---------- render ---------- */
 function render(){
   renderNav();
-  const v = $('#view'); v.innerHTML = (views[ui.view] || views.orbit)();
+  const v = $('#view'); v.innerHTML = (views[ui.view] || views.people)();
   document.body.classList.toggle('colour', colourOn());
 }
 function softRender(){
@@ -642,6 +761,9 @@ async function boot(){
   try{
     const [data, a, keys] = await Promise.all([idb.get('data'), idb.get('acct'), idb.keys()]);
     if(data) D = {...blank(), ...data};
+    let moved = false;   // older versions kept notes on each person: move them into the log
+    for(const p of D.people){ for(const n of p.notes||[]) { D.log.push(touch({id:n.id, t:n.t, people:[p.id], text:n.text})); moved = true } if(p.notes){ delete p.notes; touch(p) } delete p.srs }
+    if(moved) idb.set('data', D);
     if(a) acct = a;
     for(const k of keys) if(String(k).startsWith('ph:')) PH[k.slice(3)] = await idb.get(k);
   }catch(e){ console.warn('storage', e); toast('This browser is blocking storage, so changes won’t be saved.') }
