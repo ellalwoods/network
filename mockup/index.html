@@ -155,6 +155,17 @@ main{min-width:0;padding:0 0 96px}
 .swb.on{outline:1.5px solid var(--ink);outline-offset:2px}
 .swl{width:36px;height:36px;border-radius:50%;position:relative;overflow:hidden;flex:none;border:1px solid var(--soft)}
 .swl input{position:absolute;inset:-6px;opacity:0;cursor:pointer}
+.loginwrap{max-width:640px}
+@media (min-width:900px){.fld{padding-left:32px;padding-right:32px}}
+.loginnote{padding:14px 20px 30px;color:var(--grey);font-size:13.5px}
+@media (min-width:900px){.loginnote{padding:14px 32px 30px}}
+.pick{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--ink)}
+.pick button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 4px 12px;border-right:1px solid var(--soft);border-bottom:1px solid var(--soft);color:var(--ink)}
+.pick button:nth-child(4n){border-right:0}
+.pick button:nth-last-child(-n+4){border-bottom:0}
+.pick button span{font-size:10px}
+.pick button.on{background:var(--ink);color:var(--white)}
+#enter:disabled{background:var(--soft);color:var(--grey);cursor:default}
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgba(17,17,16,.25);display:none;z-index:30;align-items:flex-end;justify-content:center}
 .scrim.on{display:flex}
@@ -232,7 +243,7 @@ function setHex(id,h){ P(id).hex=h; localStorage.setItem('rolo-palette',JSON.str
 function setGroupColour(gid,pid){ groups.find(g=>g.id===gid).pc=pid; render() }
 function setColour(on){ state.colour=on; localStorage.setItem('rolo-colour',on?'1':'0'); render() }
 
-let state = {colour: localStorage.getItem('rolo-colour')==='1', view:'orbit', filter:'all', q:'', person:null, fc:{i:0,flipped:false,deck:'all'}};
+let state = {acct:{label:'Ella · Saturn · Crux'}, login:{name:'',planet:null,con:null}, colour: localStorage.getItem('rolo-colour')==='1', view:'orbit', filter:'all', q:'', person:null, fc:{i:0,flipped:false,deck:'all'}};
 
 const nav = [['orbit','Orbit'],['index','Index'],['drill','Drill'],['groups','Groups']];
 const gear = `<button class="mono" onclick="go('settings')">Settings</button>`;
@@ -382,11 +393,32 @@ views.settings = function(){
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Firm palette</span><span class="grey">Tap to fine-tune</span></div>
   ${palette.map(x=>`<label class="set" style="cursor:pointer"><div><b>${x.firm}</b><small>${x.name} · ${x.hex.toUpperCase()}</small></div><span class="swl" style="background:${x.hex}"><input type="color" value="${x.hex}" onchange="setHex('${x.id}',this.value)"></span></label>`).join('')}`:''}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Account &amp; sync</span></div>
-  <div class="set"><div><b>Signed in</b><small>Synced across your devices · Last sync just now</small></div><span class="mono grey">●&nbsp;Live</span></div>
-  <div class="set"><div><b>Sign-in method</b><small>To be confirmed</small></div><span class="mono grey">→</span></div>
+  <div class="set"><div><b>${state.acct?state.acct.label:'Not signed in'}</b><small>${state.acct?'Synced across your devices · Last sync just now':'Saved on this device only'}</small></div><span class="mono grey">${state.acct?'●&nbsp;Live':'○&nbsp;Local'}</span></div>
+  <button class="set" style="width:100%" onclick="go('login')"><div><b>${state.acct?'Change planet &amp; constellation':'Sign in to sync'}</b></div><span class="mono grey">→</span></button>
+  ${state.acct?`<button class="set" style="width:100%" onclick="state.acct=null;go('login')"><div><b>Switch account</b></div><span class="mono grey">→</span></button>`:''}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
   <div class="set"><div><b>Export backup</b><small>Download everyone and their notes as a file</small></div><span class="mono grey">↓</span></div>
-  <div class="set"><div><b>Sign out</b></div><span class="mono grey">→</span></div>`;
+`;
+};
+const PLANETS=[['Mercury',3],['Venus',5],['Earth',5.5],['Mars',4],['Jupiter',10],['Saturn',8.5],['Uranus',7],['Neptune',7]];
+const CONS=[['Crux','M6 3L6 15M1 8L11 8'],['Orion',''],['Lyra',''],['Cygnus',''],['Carina',''],['Centaurus',''],['Scorpius',''],['Pegasus','']];
+function planetGlyph(r,ring){ return `<svg width="34" height="26" viewBox="0 0 34 26"><circle cx="17" cy="13" r="${r}" fill="currentColor"/>${ring?'<ellipse cx="17" cy="13" rx="14" ry="3.5" fill="none" stroke="currentColor" stroke-width="1"/>':''}</svg>` }
+function conGlyph(i){ // tiny star patterns
+  const pts=[[[17,3],[17,22],[9,11],[25,11],[21,18]],[[9,4],[25,5],[14,13],[17,13],[20,13],[10,22],[24,21]],[[17,4],[13,12],[21,12],[12,21],[22,21]],[[17,3],[17,23],[7,9],[27,9],[17,13]],[[5,18],[12,14],[19,15],[26,8],[29,20]],[[6,6],[12,12],[18,10],[24,16],[28,22],[16,21]],[[6,5],[11,9],[15,14],[19,19],[24,21],[29,17]],[[8,6],[26,6],[8,20],[26,20],[3,12]]][i];
+  return `<svg width="34" height="26" viewBox="0 0 34 26">${pts.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="1.7" fill="currentColor"/>`).join('')}</svg>` }
+views.login = function(){
+  const L=state.login, ready=L.name.trim()&&L.planet&&L.con;
+  return `<div class="bar mono"><span>Rolo / Sign in</span><button class="grey" onclick="state.acct=state.acct||null;go('orbit')">Not now</button></div>
+  <div class="title">Who's in<br>orbit?</div>
+  <div class="loginwrap">
+  <label class="fld" style="border-top:1px solid var(--ink)"><span class="mono grey">01 / Your name</span><input value="${L.name}" placeholder="Ella" oninput="state.login.name=this.value;document.getElementById('enter').disabled=!(this.value.trim()&&state.login.planet&&state.login.con)"></label>
+  <div class="sect mono" style="border-top:1px solid var(--ink)"><span>02 / Pick a planet</span><span class="grey">${L.planet||''}</span></div>
+  <div class="pick">${PLANETS.map(([n,r])=>`<button class="${L.planet===n?'on':''}" onclick="state.login.planet='${n}';render()">${planetGlyph(r,n==='Saturn')}<span class="mono">${n}</span></button>`).join('')}</div>
+  <div class="sect mono" style="border-top:1px solid var(--ink)"><span>03 / Pick a constellation</span><span class="grey">${L.con||''}</span></div>
+  <div class="pick">${CONS.map(([n],i)=>`<button class="${L.con===n?'on':''}" onclick="state.login.con='${n}';render()">${conGlyph(i)}<span class="mono">${n}</span></button>`).join('')}</div>
+  <div class="sheetbtns" style="grid-template-columns:1fr;margin-top:0"><button id="enter" ${ready?'':'disabled'} onclick="state.acct={label:[state.login.name.trim(),state.login.planet,state.login.con].join(' · ')};go('orbit')">Enter orbit →</button></div>
+  <p class="loginnote">Capitals and spaces in your name don't matter. New combination? You'll be asked to start a new orbit, and anything already on this device comes with you.</p>
+  </div>`;
 };
 function nextCard(){ state.fc.i++; state.fc.flipped=false; render() }
 

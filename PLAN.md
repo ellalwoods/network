@@ -28,14 +28,26 @@ Rolo is a personal app for remembering the people you meet at work. It is a webs
 - **Import from a photo**: snap a printed cohort sheet or a LinkedIn profile to pre-fill details (later).
 - **Export/backup** to a file, and an optional passcode/Face ID lock (this is personal data).
 
-## Proposed tech
-- **Front end:** React + Vite, set up as an installable web app (a PWA: home-screen icon, works offline).
-- **Storage:** start with on-device storage (IndexedDB) so it's private and fast, with export/import for backups. Optional cloud sync later (e.g. Supabase) to share between phone and laptop.
-- **Photos:** compressed on the device before saving.
+## Tech (matches Duo Logo and DuoVino)
+- **App:** a static web app in plain JavaScript with no build step, hosted on GitHub Pages and installable on the home screen (with an offline cache).
+- **Storage:** everything is saved on the device first, so the app works offline and without an account.
+- **Sync:** through the **same Supabase project** as Duo Logo and DuoVino, using Rolo's own tables and functions so the apps stay separate.
+
+### Sign-in: name + planet + constellation
+- **The login:** your name, one of 8 planets (Mercury to Neptune) and one of 8 constellations (Crux, Orion, Lyra, Cygnus, Carina, Centaurus, Scorpius, Pegasus). For example: *"Ella · Saturn · Crux"*.
+- Names are trimmed and lowercased, so capitals and extra spaces don't matter.
+- **First visit:** shows "Who's in orbit?". A combination that doesn't exist yet offers to start a new orbit, carrying over anything already on the device. "Not now" keeps everything on the device only.
+- **The login is never stored.** The app sends only a SHA-256 hash of `rolo:` + the login.
+- **Supabase:**
+  - `rolo_load(key)` and `rolo_save(key, data)` handle people, groups, notes and settings.
+  - `rolo_photo_get` and `rolo_photo_put` store compressed photos separately, so syncing stays fast.
+  - The tables have row-level security turned on with no policies, so nothing can reach them except through those functions.
+- **Settings** shows the signed-in combination, with "Change planet & constellation" and "Switch account". If the database isn't set up yet, sign-in shows a clear message and the app keeps working on the device.
+- **Family member:** gets their own combination and their own separate orbit.
 
 ## Steps
 1. ✅ Clickable mockup and this plan. *Review the look and flows.*
-2. Set up the project and the installable-app shell, with the navigation and theme.
+2. Build the installable app with navigation, the theme (black-and-white and colour modes), device storage, and sign-in + sync with Supabase.
 3. People and Groups: create, edit and delete, plus photos and search.
 4. Flashcards with spaced repetition.
 5. Today dashboard and follow-ups.
