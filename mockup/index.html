@@ -3,145 +3,161 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F4EFE6">
+<meta name="theme-color" content="#F3F2EE">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Rolo">
 <link rel="manifest" href="manifest.json">
-<title>Rolo — mockup</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Rolo</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --paper:#F4EFE6; --card:#FFFDF8; --ink:#1F2A24; --muted:#6B726C; --line:#E2DACB;
-    --accent:#2F5D50; --accent-soft:#DCE8E2; --clay:#C9704F;
-    --g1:#E8C9A0; --g2:#B9CFC3; --g3:#D9B8C4; --g4:#C4C9E2; --g5:#E5D58F;
-    --r:18px; --shadow:0 1px 0 rgba(31,42,36,.04),0 8px 24px -12px rgba(31,42,36,.18);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Inter,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
-  h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacing:-.01em}
-  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-  .app{display:grid;grid-template-columns:minmax(0,1fr);min-height:100vh}
-  main,.cols>*,.profile>*{min-width:0}
-  /* Sidebar (laptop) */
-  .side{display:none}
-  main{padding:20px 18px 110px;max-width:1100px;width:100%;margin:0 auto}
-  /* Bottom nav (phone) */
-  .tabbar{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));display:flex;justify-content:space-around;background:var(--ink);border-radius:22px;padding:8px;box-shadow:var(--shadow);z-index:20}
-  .tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;color:#B8BFB9;font-size:11px;padding:6px 10px;border-radius:14px}
-  .tabbar button.on{color:#fff;background:rgba(255,255,255,.1)}
-  .tabbar .add{background:var(--clay);color:#fff;width:48px;height:48px;border-radius:16px;justify-content:center;font-size:24px;padding:0}
-  svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  @media (min-width:900px){
-    .app{grid-template-columns:240px minmax(0,1fr)}
-    .tabbar{display:none}
-    .side{display:flex;flex-direction:column;gap:4px;padding:28px 16px;border-right:1px solid var(--line);position:sticky;top:0;height:100vh}
-    .side .brand{font-family:Fraunces,serif;font-size:28px;padding:0 12px 20px}
-    .side .brand span{color:var(--clay)}
-    .side button{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;color:var(--muted);text-align:left}
-    .side button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
-    .side .newbtn{margin-top:12px;background:var(--ink);color:#fff;justify-content:center}
-    .side .grouplist{margin-top:24px;font-size:13px}
-    .side .grouplist p{padding:0 12px 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:11px}
-    main{padding:40px 48px}
-  }
-  .eyebrow{text-transform:uppercase;letter-spacing:.1em;font-size:11px;color:var(--muted);font-weight:600}
-  .head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;gap:12px}
-  .head h1{font-size:32px;line-height:1.1}
-  .search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:14px}
-  .search input{border:0;background:none;font:inherit;flex:1;outline:none}
-  .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:18px;scrollbar-width:none}
-  .chip{white-space:nowrap;padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:13px;display:flex;gap:6px;align-items:center}
-  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-  .dot{width:8px;height:8px;border-radius:50%}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-  .pcard{background:var(--card);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);text-align:left;display:flex;flex-direction:column;gap:10px;transition:transform .15s}
-  .pcard:hover{transform:translateY(-2px)}
-  .face{aspect-ratio:1;border-radius:14px;display:grid;place-items:center;font-family:Fraunces,serif;font-size:34px;color:rgba(31,42,36,.7);position:relative;overflow:hidden}
-  .face.sm{width:44px;height:44px;font-size:17px;border-radius:12px;flex:none}
-  .face.lg{width:120px;height:120px;font-size:44px;border-radius:24px}
-  .pcard .nm{font-weight:600}
-  .pcard .rl{font-size:12.5px;color:var(--muted)}
-  .tags{display:flex;gap:4px;flex-wrap:wrap}
-  .tag{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:500}
-  /* Home */
-  .hero{background:var(--accent);color:#F4EFE6;border-radius:24px;padding:22px;display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;position:relative;overflow:hidden}
-  .hero h2{font-size:24px;margin:4px 0 6px}
-  .hero .eyebrow{color:#B9D3C8}
-  .hero .stack{position:relative;width:96px;height:96px;flex:none}
-  .hero .stack div{position:absolute;inset:0;border-radius:14px;background:#FFFDF8}
-  .hero .stack div:nth-child(1){transform:rotate(-10deg);background:var(--g1)}
-  .hero .stack div:nth-child(2){transform:rotate(6deg);background:var(--g3)}
-  .hero .stack div:nth-child(3){display:grid;place-items:center;font-family:Fraunces;font-size:36px;color:var(--accent)}
-  .btn{background:var(--clay);color:#fff;padding:10px 18px;border-radius:12px;font-weight:600;display:inline-flex;gap:8px;align-items:center}
-  .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line)}
-  .cols{display:grid;gap:18px}
-  @media (min-width:900px){.cols{grid-template-columns:1.3fr 1fr}}
-  .panel{background:var(--card);border-radius:var(--r);padding:18px;box-shadow:var(--shadow)}
-  .panel h3{font-size:18px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
-  .panel h3 small{font-family:Inter;font-size:12px;color:var(--accent);font-weight:600}
-  .row{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line);width:100%;text-align:left}
-  .row:first-of-type{border-top:0}
-  .row .grow{flex:1;min-width:0}
-  .row .sub{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .pill{max-width:42%;overflow:hidden;text-overflow:ellipsis;font-size:11.5px;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;white-space:nowrap}
-  .pill.warm{background:#F6E1D7;color:var(--clay)}
-  .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-  .gcard{border-radius:16px;padding:14px;text-align:left;min-height:104px;display:flex;flex-direction:column;justify-content:space-between}
-  .gcard b{font-family:Fraunces,serif;font-size:17px;font-weight:600}
-  .gcard .faces{display:flex}
-  .gcard .faces span{width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.7);margin-left:-6px;display:grid;place-items:center;font-size:10px;font-weight:600;background:#FFFDF8}
-  .gcard .faces span:first-child{margin-left:0}
-  .gcard.new{border:1.5px dashed var(--line);background:transparent;color:var(--muted);align-items:center;justify-content:center}
-  /* Person */
-  .back{display:inline-flex;gap:6px;align-items:center;color:var(--muted);margin-bottom:14px}
-  .profile{display:grid;gap:18px}
-  @media (min-width:900px){.profile{grid-template-columns:320px 1fr}}
-  .idcard{background:var(--card);border-radius:24px;padding:22px;box-shadow:var(--shadow);text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
-  .idcard h1{font-size:28px}
-  .facts{width:100%;text-align:left;margin-top:8px}
-  .facts div{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
-  .facts span:first-child{color:var(--muted)}
-  .actions{display:flex;gap:8px;width:100%}
-  .actions button{flex:1;padding:10px;border-radius:12px;background:var(--paper);font-size:13px;font-weight:500}
-  .note{padding:12px 0;border-top:1px solid var(--line)}
-  .note:first-of-type{border-top:0}
-  .note .when{font-size:12px;color:var(--muted);margin-bottom:2px}
-  .hook{background:#FBF3D9;border-radius:14px;padding:12px 14px;font-size:14px;margin-bottom:10px}
-  .hook b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#8A7424;margin-bottom:2px}
-  /* Flashcards */
-  .fc-wrap{max-width:440px;margin:0 auto;text-align:center}
-  .progress{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin:10px 0 22px}
-  .progress i{display:block;height:100%;background:var(--accent);border-radius:6px;transition:width .3s}
-  .flip{perspective:1200px;height:440px;cursor:pointer}
-  .flip-in{position:relative;width:100%;height:100%;transition:transform .55s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
-  .flip.on .flip-in{transform:rotateY(180deg)}
-  .side-a,.side-b{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:var(--card);border-radius:28px;box-shadow:var(--shadow);padding:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
-  .side-a .face{width:220px;height:220px;font-size:72px;border-radius:28px}
-  .side-b{transform:rotateY(180deg);text-align:left;align-items:stretch;justify-content:flex-start}
-  .side-b h2{font-size:30px}
-  .rate{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
-  .rate button{padding:12px;border-radius:14px;font-weight:600;background:var(--card);box-shadow:var(--shadow)}
-  .rate .r1{color:var(--clay)} .rate .r3{color:var(--accent)}
-  .modes{display:flex;gap:6px;justify-content:center;margin-bottom:6px;flex-wrap:wrap}
-  /* Sheet */
-  .scrim{position:fixed;inset:0;background:rgba(31,42,36,.35);display:none;z-index:30;align-items:flex-end;justify-content:center}
-  .scrim.on{display:flex}
-  .sheet{background:var(--paper);width:100%;max-width:520px;border-radius:26px 26px 0 0;padding:22px 20px calc(24px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto;animation:up .25s ease}
-  @media (min-width:900px){.scrim{align-items:center}.sheet{border-radius:26px}}
-  @keyframes up{from{transform:translateY(40px);opacity:0}}
-  .sheet h2{font-size:24px;margin-bottom:14px}
-  .photo{width:96px;height:96px;border-radius:24px;border:1.5px dashed var(--muted);display:grid;place-items:center;color:var(--muted);margin:0 auto 14px;font-size:12px;text-align:center}
-  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:12px 0 5px}
-  .field{width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--line);background:var(--card);font:inherit}
-  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .hint{font-size:12px;color:var(--muted);margin-top:4px}
-  .annot{position:fixed;right:16px;top:16px;background:var(--ink);color:#fff;font-size:12px;padding:6px 12px;border-radius:999px;opacity:.85;z-index:40}
-  @media (max-width:899px){.annot{display:none}}
+:root{
+  --bg:#F3F2EE; --ink:#111110; --grey:#8C8B86; --soft:#D9D7D0; --faint:#E8E6E0; --white:#FBFAF7;
+  --mono:'JetBrains Mono',ui-monospace,monospace; --display:'Archivo Black',Archivo,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Archivo,system-ui,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:left}
+.mono{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.grey{color:var(--grey)}
+.app{display:grid;grid-template-columns:minmax(0,1fr);min-height:100vh}
+main{min-width:0;padding:0 0 96px}
+.side{display:none}
+
+/* top bar */
+.bar{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 12px;border-bottom:1px solid var(--ink)}
+.title{font-family:var(--display);font-size:52px;line-height:.9;letter-spacing:-.035em;text-transform:uppercase;padding:22px 20px 18px}
+.pad{padding:0 20px}
+
+/* bottom nav (phone) */
+.tabbar{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr) 64px;background:var(--bg);border-top:1px solid var(--ink);padding-bottom:env(safe-area-inset-bottom);z-index:20}
+.tabbar button{padding:18px 0;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey)}
+.tabbar button.on{color:var(--ink)}
+.tabbar button.on::before{content:'';display:block;width:5px;height:5px;border-radius:50%;background:var(--ink);margin:0 auto 5px}
+.tabbar .add{background:var(--ink);color:var(--white);font-family:Archivo;font-size:26px;font-weight:400;padding:10px 0}
+
+@media (min-width:900px){
+  .app{grid-template-columns:220px minmax(0,1fr)}
+  .tabbar{display:none}
+  main{padding:0}
+  .side{display:flex;flex-direction:column;border-right:1px solid var(--ink);position:sticky;top:0;height:100vh}
+  .side .brand{font-family:var(--display);font-size:30px;letter-spacing:-.03em;padding:18px 20px 16px;border-bottom:1px solid var(--ink)}
+  .side .navbtn{padding:14px 20px;border-bottom:1px solid var(--soft);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey);display:flex;justify-content:space-between}
+  .side .navbtn.on{color:var(--ink);background:var(--white)}
+  .side .grp{padding:9px 20px;font-size:13.5px;display:flex;justify-content:space-between;color:var(--ink)}
+  .side .grp span:last-child{font-family:var(--mono);font-size:11px;color:var(--grey)}
+  .side .newbtn{margin-top:auto;background:var(--ink);color:var(--white);padding:16px 20px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
+  .title{font-size:80px;padding:30px 32px 24px}
+  .bar{padding:18px 32px 14px}
+  .pad{padding:0 32px}
+}
+
+/* filters */
+.filters{display:flex;overflow-x:auto;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);scrollbar-width:none}
+.filters button{padding:11px 14px;border-right:1px solid var(--ink);white-space:nowrap;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.filters button.on{background:var(--ink);color:var(--white)}
+
+/* stats row */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--ink)}
+.stats button{padding:14px 20px;border-right:1px solid var(--ink)}
+.stats button:last-child{border-right:0}
+.stats b{display:block;font-family:var(--display);font-size:30px;line-height:1;letter-spacing:-.02em;margin-bottom:6px}
+
+/* orbit */
+.orbitwrap{display:grid}
+.orbit{width:100%;max-width:560px;margin:0 auto;display:block;padding:10px 6px}
+.orbit .node{cursor:pointer;transition:opacity .25s}
+.orbit .node:hover circle.face{fill:var(--ink)}
+.orbit .node:hover text.ini{fill:var(--white)}
+.orbit .dim{opacity:.12}
+.legend{display:flex;gap:18px;justify-content:center;padding:0 20px 18px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:7px}
+.lg-due{width:9px;height:9px;border-radius:50%;background:var(--ink)}
+.lg-ring{width:14px;height:14px;border-radius:50%;border:1px dashed var(--grey)}
+@media (min-width:900px){
+  .orbitwrap{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);border-bottom:1px solid var(--ink)}
+  .orbitwrap>div:first-child{border-right:1px solid var(--ink)}
+}
+
+/* list rows */
+.sect{display:flex;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--ink)}
+@media (min-width:900px){.sect{padding:14px 32px}}
+.ent{display:grid;grid-template-columns:34px 52px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--soft);width:100%}
+@media (min-width:900px){.ent{padding:12px 32px;grid-template-columns:44px 56px minmax(0,1fr) auto}}
+.ent:hover{background:var(--white)}
+.ent .n{font-family:var(--mono);font-size:11px;color:var(--grey)}
+.ent b{font-family:Archivo;font-weight:600;font-size:17px;letter-spacing:-.01em;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ent small{font-family:var(--mono);font-size:11px;color:var(--grey);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph{aspect-ratio:4/5;background:var(--faint);display:grid;place-items:center;font-family:var(--display);color:var(--ink);font-size:17px;letter-spacing:-.02em}
+.tagline{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--ink);padding:3px 6px;white-space:nowrap}
+.tagline.fill{background:var(--ink);color:var(--white)}
+.search{display:flex;gap:10px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--ink)}
+@media (min-width:900px){.search{padding:12px 32px}}
+.search input{flex:1;border:0;background:none;font:inherit;outline:none;font-size:15px}
+
+/* person */
+.back{padding:16px 20px;display:block}
+@media (min-width:900px){.back{padding:16px 32px}}
+.profile{display:grid;border-top:1px solid var(--ink)}
+@media (min-width:900px){.portrait{aspect-ratio:4/5}.profile{grid-template-columns:360px minmax(0,1fr)}.profile>div:first-child{border-right:1px solid var(--ink)}}
+.portrait{aspect-ratio:3/2;background:var(--faint);display:grid;place-items:center;font-family:var(--display);font-size:120px;letter-spacing:-.04em;border-bottom:1px solid var(--ink)}
+.pname{font-family:var(--display);font-size:44px;line-height:.92;letter-spacing:-.035em;text-transform:uppercase;padding:20px}
+.facts>div{display:grid;grid-template-columns:120px 1fr;padding:11px 20px;border-top:1px solid var(--soft);font-size:14.5px}
+.facts>div>span:first-child{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);padding-top:2px}
+.rings{display:flex;gap:0;border:1px solid var(--ink);width:max-content}
+.rings button{padding:5px 10px;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;border-right:1px solid var(--ink)}
+.rings button:last-child{border-right:0}
+.rings button.on{background:var(--ink);color:var(--white)}
+.hook{padding:20px;border-bottom:1px solid var(--ink)}
+.hook p{font-family:Archivo;font-weight:500;font-size:24px;line-height:1.2;letter-spacing:-.015em;margin-top:8px}
+.note{display:grid;grid-template-columns:70px 1fr;gap:10px;padding:14px 20px;border-bottom:1px solid var(--soft)}
+@media (min-width:900px){.hook,.note{padding-left:32px;padding-right:32px}}
+
+/* drill */
+.drill{max-width:460px;margin:0 auto;padding:0 20px}
+.prog{display:flex;gap:4px;margin:16px 0}
+.prog i{flex:1;height:2px;background:var(--soft)}
+.prog i.done{background:var(--ink)}
+.flip{perspective:1400px;height:460px;cursor:pointer}
+.flip-in{position:relative;height:100%;transition:transform .6s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+.flip.on .flip-in{transform:rotateY(180deg)}
+.fa,.fb{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1px solid var(--ink);display:flex;flex-direction:column}
+.fa{background:var(--ink);color:var(--bg)}
+.fa .big{flex:1;display:grid;place-items:center;font-family:var(--display);font-size:140px;letter-spacing:-.05em}
+.fa .foot,.fb .foot{display:flex;justify-content:space-between;padding:12px 14px;border-top:1px solid currentColor}
+.fb{background:var(--white);transform:rotateY(180deg)}
+.fb .pname{padding:18px 14px 14px;font-size:40px}
+.fb .facts>div{padding:10px 14px;grid-template-columns:90px 1fr}
+.fb .hk{margin-top:auto;padding:14px;border-top:1px solid var(--ink);font-weight:500;font-size:17px}
+.rate{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--ink);border-top:0}
+.rate button{padding:16px 0;text-align:center;border-right:1px solid var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.rate button:last-child{border-right:0;background:var(--ink);color:var(--white)}
+
+/* groups */
+.gl{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:14px;align-items:baseline;padding:18px 20px;border-bottom:1px solid var(--ink);width:100%}
+@media (min-width:900px){.gl{padding:22px 32px}}
+.gl:hover{background:var(--white)}
+.gl b{font-family:var(--display);font-size:28px;line-height:1;letter-spacing:-.03em;text-transform:uppercase}
+.gl .ct{font-family:var(--display);font-size:28px;color:var(--grey)}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(17,17,16,.25);display:none;z-index:30;align-items:flex-end;justify-content:center}
+.scrim.on{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:520px;border-top:1px solid var(--ink);max-height:92vh;overflow:auto;animation:up .25s ease;padding-bottom:env(safe-area-inset-bottom)}
+@media (min-width:900px){.scrim{align-items:center}.sheet{border:1px solid var(--ink)}}
+@keyframes up{from{transform:translateY(30px);opacity:0}}
+.sheet .title{font-size:40px;padding:20px}
+.photo{margin:0 20px 6px;height:120px;border:1px dashed var(--grey);display:grid;place-items:center}
+.fld{display:block;padding:12px 20px 10px;border-bottom:1px solid var(--soft)}
+.fld input{display:block;width:100%;border:0;background:none;font:inherit;font-size:17px;outline:none;margin-top:4px}
+.fld .opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.opt{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;border:1px solid var(--ink);padding:6px 9px}
+.opt.on{background:var(--ink);color:var(--white)}
+.sheetbtns{display:grid;grid-template-columns:1fr 2fr;border-top:1px solid var(--ink);margin-top:16px}
+.sheetbtns button{padding:18px;text-align:center;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
+.sheetbtns button:last-child{background:var(--ink);color:var(--white)}
 </style>
 </head>
 <body>
-<div class="annot">Mockup · sample data only</div>
 <div class="app">
   <aside class="side" id="side"></aside>
   <main id="view"></main>
@@ -150,171 +166,195 @@
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 
 <script>
-const I = {
-  home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
-  people:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.6c2.6.2 4.4 1.9 5 5.4"/>',
-  cards:'<rect x="3" y="6" width="14" height="14" rx="2.5"/><path d="M7 3h11a3 3 0 0 1 3 3v11"/>',
-  groups:'<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>',
-  search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
-  back:'<path d="M15 18l-6-6 6-6"/>',
-};
-const ic = (n)=>`<svg class="i" viewBox="0 0 24 24">${I[n]}</svg>`;
-
 const groups = [
-  {id:'cohort', name:'Clerkship cohort', color:'var(--g2)'},
-  {id:'partners', name:'Partners', color:'var(--g1)'},
-  {id:'disputes', name:'Disputes team', color:'var(--g4)'},
-  {id:'uni', name:'Uni friends', color:'var(--g3)'},
-  {id:'mentors', name:'Mentors', color:'var(--g5)'},
+  {id:'cohort',  name:'Clerkship cohort', short:'Cohort'},
+  {id:'partners',name:'Partners',         short:'Partners'},
+  {id:'disputes',name:'Disputes team',    short:'Disputes'},
+  {id:'mentors', name:'Mentors',          short:'Mentors'},
 ];
+// ring: 1 = inner (close), 2 = middle, 3 = outer (acquaintance)
 const people = [
-  {id:1,first:'Priya',last:'Nair',role:'Senior Associate',team:'Disputes',groups:['disputes','partners'],met:'Clerkship wk 2 — team lunch',hook:'Training for the Sydney marathon',notes:[['3 Nov','Offered to review my research memo. Follow up after exams.'],['20 Oct','Grew up in Perth, loves bouldering.']],follow:'Thank-you note',mastery:2},
-  {id:2,first:'Tom',last:'Hargreaves',role:'Partner',team:'Banking & Finance',groups:['partners'],met:'Clerkship welcome drinks',hook:'Has two kids, coaches junior cricket',notes:[['1 Nov','Said the grad program rotates every 6 months.']],follow:'Coffee in Dec',mastery:1},
-  {id:3,first:'Mei',last:'Chen',role:'Seasonal Clerk',team:'Corporate',groups:['cohort','uni'],met:'Orientation day',hook:'Also from Monash — did a law/commerce double',notes:[],mastery:3},
-  {id:4,first:'Jack',last:'Osei',role:'Seasonal Clerk',team:'Disputes',groups:['cohort'],met:'Orientation day',hook:'Plays bass in a band on weekends',notes:[],mastery:1},
-  {id:5,first:'Sophie',last:'Laurent',role:'Special Counsel',team:'Competition',groups:['mentors','partners'],met:'Women in Law breakfast',hook:'Did an LLM in Paris',notes:[['28 Oct','Happy to chat about competition law careers.']],follow:'Send article on ACCC',mastery:2},
-  {id:6,first:'Ravi',last:'Patel',role:'Seasonal Clerk',team:'Real Estate',groups:['cohort'],met:'Orientation day',hook:'Huge F1 fan',notes:[],mastery:0},
-  {id:7,first:'Grace',last:'Kim',role:'Graduate',team:'Tax',groups:['uni','mentors'],met:'Law Society mixer',hook:'Gave me tips on the interview',notes:[],mastery:3},
-  {id:8,first:'Liam',last:"O'Brien",role:'Partner',team:'Disputes',groups:['partners','disputes'],met:'Clerkship wk 1 — practice talk',hook:'Ex-rower, Irish accent',notes:[],follow:'Ask about secondment',mastery:0},
+  {id:1,first:'Priya',last:'Nair',role:'Senior Associate',team:'Disputes',groups:['disputes','mentors'],ring:1,due:true,met:'Clerkship wk 2, team lunch',hook:'Training for the Sydney marathon',follow:'Thank-you note',notes:[['03 Nov','Offered to review my research memo. Follow up after exams.'],['20 Oct','Grew up in Perth. Loves bouldering.']]},
+  {id:2,first:'Tom',last:'Hargreaves',role:'Partner',team:'Banking',groups:['partners'],ring:3,due:true,met:'Welcome drinks',hook:'Coaches junior cricket on Saturdays',follow:'Coffee in Dec',notes:[['01 Nov','Grad program rotates every 6 months.']]},
+  {id:3,first:'Mei',last:'Chen',role:'Seasonal Clerk',team:'Corporate',groups:['cohort'],ring:1,met:'Orientation day',hook:'Also Monash, law/commerce',notes:[]},
+  {id:4,first:'Jack',last:'Osei',role:'Seasonal Clerk',team:'Disputes',groups:['cohort'],ring:2,due:true,met:'Orientation day',hook:'Plays bass in a band',notes:[]},
+  {id:5,first:'Sophie',last:'Laurent',role:'Special Counsel',team:'Competition',groups:['mentors'],ring:2,met:'Women in Law breakfast',hook:'Did an LLM in Paris',follow:'Send ACCC article',notes:[['28 Oct','Happy to chat about competition law.']]},
+  {id:6,first:'Ravi',last:'Patel',role:'Seasonal Clerk',team:'Real Estate',groups:['cohort'],ring:2,met:'Orientation day',hook:'Huge F1 fan',notes:[]},
+  {id:7,first:'Grace',last:'Kim',role:'Graduate',team:'Tax',groups:['mentors'],ring:1,met:'Law Society mixer',hook:'Gave me interview tips',notes:[]},
+  {id:8,first:'Liam',last:"O'Brien",role:'Partner',team:'Disputes',groups:['partners','disputes'],ring:3,due:true,met:'Practice talk, wk 1',hook:'Ex-rower, Irish accent',follow:'Ask about secondment',notes:[]},
+  {id:9,first:'Hannah',last:'Brooks',role:'Seasonal Clerk',team:'Banking',groups:['cohort'],ring:3,met:'Orientation day',hook:'Ran the uni debating society',notes:[]},
+  {id:10,first:'Daniel',last:'Ng',role:'Associate',team:'Disputes',groups:['disputes'],ring:2,met:'Clerkship wk 2',hook:'Cat called Brief',notes:[]},
+  {id:11,first:'Amara',last:'Okafor',role:'Partner',team:'Corporate',groups:['partners'],ring:2,met:'Partner Q&A panel',hook:'Started as a paralegal',notes:[]},
+  {id:12,first:'Ben',last:'Walsh',role:'Seasonal Clerk',team:'Tax',groups:['cohort'],ring:3,met:'Orientation day',hook:'Moving to London next year',notes:[]},
 ];
-const tones = ['#E8C9A0','#B9CFC3','#D9B8C4','#C4C9E2','#E5D58F','#D6C7B4'];
-const tone = p => tones[p.id % tones.length];
-const init = p => p.first[0]+p.last[0];
+const pad = n => String(n).padStart(3,'0');
+const ini = p => p.first[0]+p.last[0];
 const G = id => groups.find(g=>g.id===id);
-const face = (p,cls='') => `<div class="face ${cls}" style="background:${tone(p)}">${init(p)}</div>`;
-const tags = p => `<div class="tags">${p.groups.map(g=>`<span class="tag" style="background:${G(g).color}">${G(g).name}</span>`).join('')}</div>`;
+const inG = (g) => people.filter(p=>p.groups.includes(g));
 
-let state = {view:'home', filter:'all', q:'', person:null, fc:{i:0, flipped:false, deck:'all'}};
+let state = {view:'orbit', filter:'all', q:'', person:null, fc:{i:0,flipped:false,deck:'all'}};
 
-const nav = [['home','Today'],['people','People'],['cards','Practice'],['groups','Groups']];
+const nav = [['orbit','Orbit'],['index','Index'],['drill','Drill'],['groups','Groups']];
 function renderNav(){
-  const v = state.view==='person' ? 'people' : state.view;
-  document.getElementById('side').innerHTML = `<div class="brand">Rolo<span>.</span></div>` +
-    nav.map(([k,l])=>`<button class="${v===k?'on':''}" onclick="go('${k}')">${ic(k)}${l}</button>`).join('') +
-    `<button class="newbtn" onclick="openAdd()">+ Add person</button>
-     <div class="grouplist"><p>Groups</p>${groups.map(g=>`<button onclick="state.filter='${g.id}';go('people')"><span class="dot" style="background:${g.color};width:10px;height:10px"></span>${g.name}</button>`).join('')}</div>`;
-  const t = nav.map(([k,l])=>`<button class="${v===k?'on':''}" onclick="go('${k}')">${ic(k)}${l}</button>`);
-  t.splice(2,0,`<button class="add" onclick="openAdd()" aria-label="Add person">+</button>`);
-  document.getElementById('tabbar').innerHTML = t.join('');
+  const v = state.view==='person'?'index':state.view;
+  document.getElementById('side').innerHTML =
+    `<div class="brand">Rolo</div>` +
+    nav.map(([k,l],i)=>`<button class="navbtn ${v===k?'on':''}" onclick="go('${k}')"><span>${l}</span><span>0${i+1}</span></button>`).join('') +
+    `<div class="mono grey" style="padding:22px 20px 8px">Groups</div>` +
+    groups.map(g=>`<button class="grp" onclick="state.filter='${g.id}';go('index')"><span>${g.name}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
+    `<button class="newbtn" onclick="openAdd()">+ New person</button>`;
+  document.getElementById('tabbar').innerHTML =
+    nav.map(([k,l])=>`<button class="${v===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('') +
+    `<button class="add" onclick="openAdd()" aria-label="Add person">+</button>`;
 }
-function go(v){ state.view=v; if(v==='cards'){state.fc.i=0;state.fc.flipped=false} render(); window.scrollTo(0,0) }
+function go(v){ state.view=v; if(v==='drill'){state.fc.i=0;state.fc.flipped=false} render(); window.scrollTo(0,0) }
 function openPerson(id){ state.person=id; go('person') }
 
+function orbitSVG(){
+  const C=210, R={1:78,2:132,3:186}, n=groups.length, step=2*Math.PI/n, start=-Math.PI/2;
+  let s = `<svg class="orbit" viewBox="0 0 420 420" font-family="JetBrains Mono, monospace">`;
+  [R[1],R[2],R[3]].forEach(r=>s+=`<circle cx="${C}" cy="${C}" r="${r}" fill="none" stroke="#8C8B86" stroke-width=".6" stroke-dasharray="2 4"/>`);
+  groups.forEach((g,gi)=>{
+    const a=start+gi*step;
+    s+=`<line x1="${C+34*Math.cos(a)}" y1="${C+34*Math.sin(a)}" x2="${C+204*Math.cos(a)}" y2="${C+204*Math.sin(a)}" stroke="#D9D7D0" stroke-width=".8"/>`;
+    const m=a+step/2, lx=C+201*Math.cos(m), ly=C+201*Math.sin(m);
+    const dim = state.filter!=='all'&&state.filter!==g.id;
+    s+=`<text x="${lx}" y="${ly}" font-size="9" letter-spacing=".8" text-anchor="middle" dominant-baseline="middle" fill="#111110" opacity="${dim?.25:1}" style="cursor:pointer" onclick="state.filter=state.filter==='${g.id}'?'all':'${g.id}';render()">${g.short.toUpperCase()}</text>`;
+  });
+  s+=`<circle cx="${C}" cy="${C}" r="24" fill="#111110"/><text x="${C}" y="${C+1}" font-size="9" letter-spacing="1" text-anchor="middle" dominant-baseline="middle" fill="#FBFAF7">YOU</text>`;
+  groups.forEach((g,gi)=>{
+    [1,2,3].forEach(ring=>{
+      const ps=people.filter(p=>p.groups[0]===g.id&&p.ring===ring);
+      ps.forEach((p,k)=>{
+        const a=start+gi*step+step*(k+1)/(ps.length+1)+(ring===2?.08:0);
+        const x=C+R[ring]*Math.cos(a), y=C+R[ring]*Math.sin(a);
+        const dim = state.filter!=='all'&&!p.groups.includes(state.filter);
+        s+=`<g class="node ${dim?'dim':''}" onclick="openPerson(${p.id})">
+          <circle class="face" cx="${x}" cy="${y}" r="15" fill="#FBFAF7" stroke="#111110" stroke-width="1"/>
+          <text class="ini" x="${x}" y="${y+.5}" font-size="9" font-family="Archivo Black, sans-serif" text-anchor="middle" dominant-baseline="middle" fill="#111110">${ini(p)}</text>
+          ${p.due?`<circle cx="${x+11}" cy="${y-11}" r="3.6" fill="#111110" stroke="#F3F2EE" stroke-width="1.5"/>`:''}
+          <text x="${x}" y="${y+26}" font-size="8" text-anchor="middle" fill="#8C8B86">${p.first.toUpperCase()}</text></g>`;
+      });
+    });
+  });
+  return s+`</svg>`;
+}
+
+const row = (p,i,right='') => `<button class="ent" onclick="openPerson(${p.id})"><span class="n">${pad(i)}</span><div class="ph">${ini(p)}</div><div style="min-width:0"><b>${p.first} ${p.last}</b><small>${p.role} / ${p.team}</small></div>${right}</button>`;
+
 const views = {
-home(){
-  const due = people.filter(p=>p.mastery<2).length;
-  const fol = people.filter(p=>p.follow);
+orbit(){
+  const due=people.filter(p=>p.due), fol=people.filter(p=>p.follow);
   return `
-  <div class="head"><div><div class="eyebrow">Wednesday 25 November</div><h1>Good morning</h1></div></div>
-  <div class="hero">
-    <div><div class="eyebrow">Daily practice</div><h2>${due} faces to review</h2>
-    <p style="opacity:.85;font-size:14px;margin-bottom:14px">About 2 minutes. Keeps names fresh before Monday.</p>
-    <button class="btn" onclick="go('cards')">Start practice →</button></div>
-    <div class="stack"><div></div><div></div><div>?</div></div>
+  <div class="bar mono"><span>Wed 25 Nov</span><span class="grey">Rolo / Orbit</span></div>
+  <div class="stats">
+    <button onclick="go('index')"><b>${pad(people.length)}</b><span class="mono grey">People</span></button>
+    <button onclick="go('drill')"><b>${pad(due.length)}</b><span class="mono grey">Due to drill</span></button>
+    <button><b>${pad(fol.length)}</b><span class="mono grey">Follow-ups</span></button>
   </div>
-  <div class="cols">
-    <div class="panel"><h3>Follow-ups <small>${fol.length} open</small></h3>
-      ${fol.map(p=>`<button class="row" onclick="openPerson(${p.id})">${face(p,'sm')}<div class="grow"><b>${p.first} ${p.last}</b><div class="sub">${p.role} · ${p.team}</div></div><span class="pill warm">${p.follow}</span></button>`).join('')}
+  <div class="orbitwrap">
+    <div>
+      <div class="filters" style="border-top:0"><button class="${state.filter==='all'?'on':''}" onclick="state.filter='all';render()">All</button>${groups.map(g=>`<button class="${state.filter===g.id?'on':''}" onclick="state.filter='${g.id}';render()">${g.short}</button>`).join('')}</div>
+      ${orbitSVG()}
+      <div class="legend mono grey"><span><i class="lg-due"></i>Due to drill</span><span><i class="lg-ring"></i>Inner ring = closer</span></div>
     </div>
-    <div class="panel"><h3>Recently met <small onclick="go('people')" style="cursor:pointer">See all</small></h3>
-      ${people.slice(2,6).map(p=>`<button class="row" onclick="openPerson(${p.id})">${face(p,'sm')}<div class="grow"><b>${p.first} ${p.last}</b><div class="sub">${p.met}</div></div></button>`).join('')}
+    <div>
+      <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Due to drill</span><button class="grey" onclick="go('drill')">Start →</button></div>
+      ${due.map((p,i)=>row(p,i+1)).join('')}
+      <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Follow-ups</span><span class="grey">${pad(fol.length)}</span></div>
+      ${fol.map((p,i)=>row(p,i+1,`<span class="tagline">${p.follow}</span>`)).join('')}
     </div>
   </div>`;
 },
-people(){
-  const q = state.q.toLowerCase();
-  const list = people.filter(p=>(state.filter==='all'||p.groups.includes(state.filter)) &&
-    (!q || `${p.first} ${p.last} ${p.team} ${p.role} ${p.hook}`.toLowerCase().includes(q)));
+index(){
+  const q=state.q.toLowerCase();
+  const list=people.filter(p=>(state.filter==='all'||p.groups.includes(state.filter))&&(!q||`${p.first} ${p.last} ${p.team} ${p.role} ${p.hook} ${p.met}`.toLowerCase().includes(q)));
   return `
-  <div class="head"><div><div class="eyebrow">${people.length} people</div><h1>Your network</h1></div>
-  <button class="btn ghost" onclick="openAdd()">+ Add</button></div>
-  <div class="search">${ic('search')}<input placeholder="Search names, teams, details…" value="${state.q}" oninput="state.q=this.value;render(true)"></div>
-  <div class="chips">
-    <button class="chip ${state.filter==='all'?'on':''}" onclick="state.filter='all';render()">Everyone</button>
-    ${groups.map(g=>`<button class="chip ${state.filter===g.id?'on':''}" onclick="state.filter='${g.id}';render()"><span class="dot" style="background:${g.color}"></span>${g.name}</button>`).join('')}
-    <button class="chip" onclick="openGroup()">+ New group</button>
-  </div>
-  <div class="grid">${list.map(p=>`<button class="pcard" onclick="openPerson(${p.id})">${face(p)}<div><div class="nm">${p.first} ${p.last}</div><div class="rl">${p.role} · ${p.team}</div></div>${tags(p)}</button>`).join('') || '<p style="color:var(--muted)">No one matches yet.</p>'}</div>`;
+  <div class="bar mono"><span>Rolo / Index</span><span class="grey">${pad(list.length)} entries</span></div>
+  <div class="title">Index</div>
+  <div class="filters"><button class="${state.filter==='all'?'on':''}" onclick="state.filter='all';render()">All</button>${groups.map(g=>`<button class="${state.filter===g.id?'on':''}" onclick="state.filter='${g.id}';render()">${g.short}</button>`).join('')}<button onclick="openGroup()">+ Group</button></div>
+  <div class="search"><span class="mono grey">Search</span><input value="${state.q}" placeholder="Name, team or detail" oninput="state.q=this.value;render(true)"></div>
+  <div id="list">${list.map((p,i)=>row(p,i+1,p.follow?`<span class="tagline">Follow up</span>`:'')).join('')||'<p class="pad mono grey" style="padding-top:20px">No matches</p>'}</div>`;
 },
 person(){
-  const p = people.find(x=>x.id===state.person);
+  const p=people.find(x=>x.id===state.person), idx=people.indexOf(p)+1;
   return `
-  <button class="back" onclick="go('people')">${ic('back')} People</button>
-  <div class="profile">
-    <div class="idcard">${face(p,'lg')}<h1>${p.first} ${p.last}</h1><div style="color:var(--muted)">${p.role}</div>${tags(p)}
-      <div class="facts"><div><span>Team</span><span>${p.team}</span></div><div><span>Where we met</span><span style="text-align:right">${p.met}</span></div><div><span>Recall</span><span>${'●'.repeat(p.mastery)}${'○'.repeat(3-p.mastery)}</span></div></div>
-      <div class="actions"><button>✉ Email</button><button>LinkedIn</button><button>✎ Edit</button></div>
+  <div class="bar mono"><button onclick="go('index')">← Index</button><span class="grey">Entry ${pad(idx)}</span></div>
+  <div class="profile" style="border-top:0">
+    <div>
+      <div class="portrait">${ini(p)}</div>
+      <div class="pname">${p.first}<br>${p.last}</div>
+      <div class="facts">
+        <div><span>Role</span><span>${p.role}</span></div>
+        <div><span>Team</span><span>${p.team}</span></div>
+        <div><span>Met</span><span>${p.met}</span></div>
+        <div><span>Groups</span><span>${p.groups.map(g=>G(g).name).join(', ')}</span></div>
+        <div><span>Orbit</span><span class="rings">${['Inner','Middle','Outer'].map((l,i)=>`<button class="${p.ring===i+1?'on':''}" onclick="people.find(x=>x.id===${p.id}).ring=${i+1};render()">${l}</button>`).join('')}</span></div>
+      </div>
     </div>
-    <div class="panel">
-      <div class="hook"><b>Memory hook</b>${p.hook}</div>
-      ${p.follow?`<div class="hook" style="background:#F6E1D7"><b style="color:var(--clay)">Follow-up</b>${p.follow}</div>`:''}
-      <h3 style="margin-top:8px">Notes <small>+ Add note</small></h3>
-      ${p.notes.length?p.notes.map(([d,t])=>`<div class="note"><div class="when">${d}</div>${t}</div>`).join(''):'<p style="color:var(--muted)">No notes yet — jot down something they mentioned.</p>'}
+    <div>
+      <div class="hook"><span class="mono grey">Memory hook</span><p>${p.hook}</p></div>
+      ${p.follow?`<div class="hook"><span class="mono grey">Follow-up</span><p>${p.follow}</p></div>`:''}
+      <div class="sect mono"><span>Notes</span><button class="grey">+ Add</button></div>
+      ${p.notes.length?p.notes.map(([d,t])=>`<div class="note"><span class="mono grey">${d}</span><span>${t}</span></div>`).join(''):'<div class="note"><span class="mono grey">—</span><span class="grey">Nothing yet. Add something they mentioned.</span></div>'}
     </div>
   </div>`;
 },
-cards(){
-  const deck = state.fc.deck==='all'?people:people.filter(p=>p.groups.includes(state.fc.deck));
-  const i = state.fc.i;
-  if(i>=deck.length) return `<div class="fc-wrap"><h1 style="font-size:34px;margin:60px 0 10px">All done ✦</h1><p style="color:var(--muted);margin-bottom:20px">You reviewed ${deck.length} people.</p><button class="btn" onclick="go('cards')">Go again</button></div>`;
-  const p = deck[i];
-  return `<div class="fc-wrap">
-    <div class="eyebrow">Practice</div>
-    <h1 style="font-size:28px;margin:4px 0 12px">Who's this?</h1>
-    <div class="modes">${[['all','Everyone'],...groups.map(g=>[g.id,g.name])].map(([k,l])=>`<button class="chip ${state.fc.deck===k?'on':''}" onclick="state.fc={i:0,flipped:false,deck:'${k}'};render()">${l}</button>`).join('')}</div>
-    <div class="progress"><i style="width:${i/deck.length*100}%"></i></div>
+drill(){
+  const deck=state.fc.deck==='all'?people.filter(p=>p.due):inG(state.fc.deck);
+  const i=state.fc.i;
+  const head=`<div class="bar mono"><span>Rolo / Drill</span><span class="grey">${String(Math.min(i+1,deck.length)).padStart(2,'0')}/${String(deck.length).padStart(2,'0')}</span></div>
+  <div class="filters" style="border-top:0"><button class="${state.fc.deck==='all'?'on':''}" onclick="state.fc={i:0,flipped:false,deck:'all'};render()">Due</button>${groups.map(g=>`<button class="${state.fc.deck===g.id?'on':''}" onclick="state.fc={i:0,flipped:false,deck:'${g.id}'};render()">${g.short}</button>`).join('')}</div>`;
+  if(i>=deck.length) return head+`<div class="drill"><div class="title" style="padding:40px 0 10px">Done.</div><p class="mono grey" style="margin-bottom:24px">${pad(deck.length)} reviewed</p><div class="rate" style="border-top:1px solid var(--ink);grid-template-columns:1fr"><button onclick="go('drill')">Again →</button></div></div>`;
+  const p=deck[i];
+  return head+`<div class="drill">
+    <div class="prog">${deck.map((_,k)=>`<i class="${k<i?'done':''}"></i>`).join('')}</div>
     <div class="flip ${state.fc.flipped?'on':''}" onclick="state.fc.flipped=!state.fc.flipped;this.classList.toggle('on')">
       <div class="flip-in">
-        <div class="side-a">${face(p)}<p style="color:var(--muted);font-size:14px">Tap to reveal · ${i+1} of ${deck.length}</p></div>
-        <div class="side-b">
-          <div style="display:flex;gap:12px;align-items:center">${face(p,'sm')}<div><h2>${p.first} ${p.last}</h2><div style="color:var(--muted)">${p.role}</div></div></div>
-          <div class="facts"><div><span>Team</span><span>${p.team}</span></div><div><span>Met</span><span style="text-align:right">${p.met}</span></div></div>
-          <div class="hook" style="margin:0"><b>Memory hook</b>${p.hook}</div>
-          ${tags(p)}
-        </div>
+        <div class="fa"><div class="foot mono" style="border-top:0;border-bottom:1px solid #444"><span>${pad(people.indexOf(p)+1)}: Who?</span><span>${G(p.groups[0]).short}</span></div><div class="big">${ini(p)}</div><div class="foot mono" style="border-color:#444"><span>Tap to reveal</span><span>↻</span></div></div>
+        <div class="fb"><div class="pname">${p.first}<br>${p.last}</div>
+          <div class="facts"><div><span>Role</span><span>${p.role}</span></div><div><span>Team</span><span>${p.team}</span></div><div><span>Met</span><span>${p.met}</span></div></div>
+          <div class="hk"><span class="mono grey" style="display:block;margin-bottom:4px">Memory hook</span>${p.hook}</div></div>
       </div>
     </div>
-    <div class="rate"><button class="r1" onclick="next()">Forgot</button><button onclick="next()">Almost</button><button class="r3" onclick="next()">Got it</button></div>
+    <div class="rate"><button onclick="nextCard()">Forgot</button><button onclick="nextCard()">Almost</button><button onclick="nextCard()">Got it</button></div>
   </div>`;
 },
 groups(){
-  return `<div class="head"><div><div class="eyebrow">${groups.length} groups</div><h1>Groups</h1></div></div>
-  <p style="color:var(--muted);margin:-8px 0 18px;max-width:520px">Make a group for any context — a cohort, a team, an event. One person can be in as many groups as you like.</p>
-  <div class="groups">${groups.map(g=>{const m=people.filter(p=>p.groups.includes(g.id));return `<button class="gcard" style="background:${g.color}" onclick="state.filter='${g.id}';go('people')"><b>${g.name}</b><div style="display:flex;justify-content:space-between;align-items:center"><div class="faces">${m.slice(0,4).map(p=>`<span>${init(p)}</span>`).join('')}</div><span style="font-size:12px;font-weight:600">${m.length}</span></div></button>`}).join('')}
-  <button class="gcard new" onclick="openGroup()">+ New group</button></div>`;
+  return `<div class="bar mono"><span>Rolo / Groups</span><span class="grey">${pad(groups.length)} groups</span></div>
+  <div class="title">Groups</div>
+  <div style="border-top:1px solid var(--ink)">
+  ${groups.map((g,i)=>`<button class="gl" onclick="state.filter='${g.id}';go('index')"><span class="mono grey">${pad(i+1)}</span><b>${g.name}</b><span class="ct">${pad(inG(g.id).length)}</span></button>`).join('')}
+  <button class="gl" onclick="openGroup()"><span class="mono grey">+</span><b class="grey">New group</b><span></span></button></div>`;
 },
 };
-function next(){ state.fc.i++; state.fc.flipped=false; render() }
+function nextCard(){ state.fc.i++; state.fc.flipped=false; render() }
 
 function openAdd(){
-  sheet(`<h2>Add someone new</h2>
-  <div class="photo">＋<br>Add photo</div>
-  <div class="two"><div><label>First name</label><input class="field" placeholder="Priya"></div><div><label>Last name</label><input class="field" placeholder="Nair"></div></div>
-  <div class="two"><div><label>Role</label><input class="field" placeholder="Associate"></div><div><label>Team</label><input class="field" placeholder="Disputes"></div></div>
-  <label>Groups</label><div class="chips" style="flex-wrap:wrap">${groups.map((g,i)=>`<button class="chip ${i===0?'on':''}" onclick="this.classList.toggle('on')"><span class="dot" style="background:${g.color}"></span>${g.name}</button>`).join('')}<button class="chip" onclick="openGroup()">+ New</button></div>
-  <label>Where you met</label><input class="field" placeholder="e.g. Clerkship welcome drinks">
-  <label>Memory hook</label><input class="field" placeholder="One thing that'll help you remember them">
-  <div class="hint">This shows on the back of their flashcard.</div>
-  <div style="display:flex;gap:8px;margin-top:20px"><button class="btn ghost" style="flex:1;justify-content:center" onclick="closeSheet()">Cancel</button><button class="btn" style="flex:2;justify-content:center" onclick="closeSheet()">Save person</button></div>`);
+  sheet(`<div class="title">New<br>person</div>
+  <div class="photo mono grey">+ Add photo</div>
+  <label class="fld"><span class="mono grey">Name</span><input placeholder="First and last name"></label>
+  <label class="fld"><span class="mono grey">Role / team</span><input placeholder="Associate, Disputes"></label>
+  <div class="fld"><span class="mono grey">Groups</span><div class="opts">${groups.map((g,i)=>`<button class="opt ${i===0?'on':''}" onclick="this.classList.toggle('on')">${g.short}</button>`).join('')}<button class="opt" onclick="openGroup()">+ New</button></div></div>
+  <div class="fld"><span class="mono grey">Orbit</span><div class="opts">${['Inner','Middle','Outer'].map((l,i)=>`<button class="opt ${i===2?'on':''}">${l}</button>`).join('')}</div></div>
+  <label class="fld"><span class="mono grey">Where you met</span><input placeholder="Clerkship welcome drinks"></label>
+  <label class="fld"><span class="mono grey">Memory hook</span><input placeholder="One detail to remember them by"></label>
+  <div class="sheetbtns"><button onclick="closeSheet()">Cancel</button><button onclick="closeSheet()">Save →</button></div>`);
 }
 function openGroup(){
-  sheet(`<h2>New group</h2>
-  <label>Name</label><input class="field" placeholder="e.g. Summer clerkship 2026" autofocus>
-  <label>Colour</label><div style="display:flex;gap:10px">${['g1','g2','g3','g4','g5'].map((c,i)=>`<button style="width:36px;height:36px;border-radius:12px;background:var(--${c});${i===1?'outline:2px solid var(--ink);outline-offset:2px':''}"></button>`).join('')}</div>
-  <div style="display:flex;gap:8px;margin-top:22px"><button class="btn ghost" style="flex:1;justify-content:center" onclick="closeSheet()">Cancel</button><button class="btn" style="flex:2;justify-content:center" onclick="closeSheet()">Create group</button></div>`);
+  sheet(`<div class="title">New<br>group</div>
+  <label class="fld"><span class="mono grey">Name</span><input placeholder="Summer clerkship 2026"></label>
+  <div class="sheetbtns"><button onclick="closeSheet()">Cancel</button><button onclick="closeSheet()">Create →</button></div>`);
 }
 function sheet(h){ document.getElementById('sheet').innerHTML=h; document.getElementById('scrim').classList.add('on') }
 function closeSheet(){ document.getElementById('scrim').classList.remove('on') }
 document.getElementById('scrim').addEventListener('click',e=>{ if(e.target.id==='scrim') closeSheet() });
 
-function render(keepFocus){
+function render(searchOnly){
   renderNav();
   const v=document.getElementById('view');
-  if(keepFocus){ // re-render only the grid while typing in search
-    const tmp=document.createElement('div'); tmp.innerHTML=views.people();
-    v.querySelector('.grid').replaceWith(tmp.querySelector('.grid')); return;
-  }
-  v.innerHTML = views[state.view]();
+  if(searchOnly){ const t=document.createElement('div'); t.innerHTML=views.index(); v.querySelector('#list').replaceWith(t.querySelector('#list')); return; }
+  v.innerHTML=views[state.view]();
 }
 render();
 </script>
