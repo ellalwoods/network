@@ -150,7 +150,7 @@ main{min-width:0;padding:0 0 96px}
 .tog.on i{transform:translateX(22px);background:var(--white)}
 .sw{display:inline-block;width:9px;height:9px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(17,17,16,.5);margin-right:8px;vertical-align:middle}
 .filters button.on .sw{outline:1px solid var(--white)}
-.swatches{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:160px;flex:none}
+.swatches{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:180px;flex:none}
 .swb{width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(17,17,16,.4)}
 .swb.on{outline:1.5px solid var(--ink);outline-offset:2px}
 .swl{width:36px;height:36px;border-radius:50%;position:relative;overflow:hidden;flex:none;border:1px solid var(--soft)}
@@ -196,15 +196,12 @@ main{min-width:0;padding:0 0 96px}
 // Firm palette, sampled from the firms' own brand artwork. Fine-tune in Settings.
 const palette = [
   {id:'kwm',    firm:'Mallesons',            name:'Periwinkle',    hex:'#CCCCFE'},
-  {id:'kwm2',   firm:'Mallesons',            name:'Blackcurrant',  hex:'#1C1028'},
-  {id:'kwm3',   firm:'Mallesons',            name:'Violet',        hex:'#4F3479'},
-  {id:'apc',    firm:'Ashurst Perkins Coie', name:'Liberty green', hex:'#00F2B6'},
+  {id:'kwm2',   firm:'Mallesons',            name:'Blackcurrant',  hex:'#33203F'},
+  {id:'apc',    firm:'Ashurst Perkins Coie', name:'Liberty green', hex:'#3DE3B9'},
   {id:'apc2',   firm:'Ashurst Perkins Coie', name:'Deep teal',     hex:'#002D3B'},
-  {id:'ash',    firm:'Ashurst (prior)',      name:'Coral',         hex:'#FF5F49'},
-  {id:'allens', firm:'Allens',               name:'Blue',          hex:'#0074BF'},
-  {id:'allens2',firm:'Allens',               name:'Magenta',       hex:'#AF005F'},
+  {id:'ash',    firm:'Ashurst (prior)',      name:'Peach',         hex:'#F98D72'},
+  {id:'allens', firm:'Allens',               name:'Magenta',       hex:'#AF005F'},
   {id:'hsf',    firm:'HSF Kramer',           name:'Teal',          hex:'#40AAB8'},
-  {id:'hsf2',   firm:'HSF Kramer',           name:'Navy',          hex:'#1B3E78'},
 ];
 const P = id => palette.find(x=>x.id===id);
 (JSON.parse(localStorage.getItem('rolo-palette')||'[]')).forEach(([id,h])=>{ if(P(id)) P(id).hex=h });
