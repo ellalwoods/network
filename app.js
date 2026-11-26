@@ -843,11 +843,10 @@ const pendingPack = () => null;
 const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : '';
 // one-off tidy-ups for Ella's account
 function fixups(){
-  if(acctName() !== 'ella' || localStorage.getItem('fix-sydney')) return;
+  if(localStorage.getItem('fix-sydney')) return;
   let changed = false;
-  D.groups.forEach(g => { if(norm(g.name) === 'sydney'){ g.name = 'Allens Sydney'; if(!g.short || norm(g.short) === 'sydney') g.short = 'Allens Sydney'; touch(g); changed = true } });
+  D.groups.forEach(g => { if(norm(g.name).replace(/[^a-z]/g,'') === 'sydney'){ g.name = 'Allens Sydney'; if(!g.short || norm(g.short) === 'sydney') g.short = 'Allens Sydney'; touch(g); changed = true } });
   if(changed){ localStorage.setItem('fix-sydney','1'); commit(); toast('Renamed “Sydney” to “Allens Sydney”') }
-  else if(sync.state === 'ok') localStorage.setItem('fix-sydney','1');
 }
 async function autoPacks(){
   for(const k of PACKS){
