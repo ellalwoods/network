@@ -639,7 +639,7 @@ async function submitLogin(){
     } else {
       const remote = await rpc('rolo_load',{p_key:key});
       if(remote){ acct = {label,key}; await idb.set('acct',acct); D = merge(D, remote); await idb.set('data',D);
-        L.busy = false; toast('Welcome back'); go('people'); await syncNow(); autoPacks(); return }
+        L.busy = false; toast('Welcome back'); go('people'); await syncNow(); autoPacks(); fixups(); return }
       L.pending = {label, key}; L.busy = false; render();
       return sheet(`<div class="title">New<br>orbit?</div>
         <p class="intro" style="padding-top:0">There’s no orbit for <b>${esc(label)}</b> yet.${D.people.length?` The ${D.people.length} ${D.people.length===1?'person':'people'} on this device will come with you.`:''}</p>
@@ -841,6 +841,14 @@ const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', prefix:'s
 const pendingPack = () => null;
 // Add starter packs automatically, once per device (never re-adds a group you've deleted)
 const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : '';
+// one-off tidy-ups for Ella's account
+function fixups(){
+  if(acctName() !== 'ella' || localStorage.getItem('fix-sydney')) return;
+  let changed = false;
+  D.groups.forEach(g => { if(norm(g.name) === 'sydney'){ g.name = 'Allens Sydney'; if(!g.short || norm(g.short) === 'sydney') g.short = 'Allens Sydney'; touch(g); changed = true } });
+  if(changed){ localStorage.setItem('fix-sydney','1'); commit(); toast('Renamed “Sydney” to “Allens Sydney”') }
+  else if(sync.state === 'ok') localStorage.setItem('fix-sydney','1');
+}
 async function autoPacks(){
   for(const k of PACKS){
     // packs belong to one person's account only
@@ -963,7 +971,7 @@ async function boot(){
   if(!acct && !localStorage.getItem('rolo-skip-login') && SYNC_ON) ui.view = 'login';
   render();
   if(acct) await syncNow();
-  autoPacks();
+  autoPacks(); fixups();
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') syncNow() });
   window.addEventListener('online', () => syncNow());
   if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
