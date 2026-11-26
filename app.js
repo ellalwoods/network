@@ -311,7 +311,7 @@ function personRow(p, m){
   const e = m[p.id];
   return `<button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small>
     ${e ? `<span class="snip"><span class="mono grey">${esc(rel(e.t))}</span> ${esc(e.text.slice(0,90))}</span>` : p.met ? `<span class="snip"><span class="mono grey">Met</span> ${esc(p.met)}</span>` : ''}</div>
-    ${isProspect(p) ? `<span class="tagline">To meet</span>` : p.follow ? `<span class="tagline" ${tagStyle(p)}>Follow up</span>` : ''}</button>`;
+    ${isProspect(p) ? `<span class="tagline">To meet</span>` : p.catchup ? `<span class="tagline">Catch up</span>` : p.follow ? `<span class="tagline" ${tagStyle(p)}>Follow up</span>` : ''}</button>`;
 }
 function personCard(p){
   return `<button class="pcard" onclick="openPerson('${p.id}')">${faceBox(p,'pc-face')}<b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small></button>`;
@@ -397,6 +397,7 @@ views.person = () => {
       ${faceBox(p,'portrait')}
       <div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
       <div class="facts">
+        ${isProspect(p) ? '' : `<div><span>Catch up</span><span>${p.catchup ? `<span class="tagline">On your list</span> <button class="glink grey" style="margin-left:8px" onclick="setCatchup('${p.id}',false)">Remove</button>` : `<button class="btn small ghost" onclick="setCatchup('${p.id}',true)">+ Want to catch up</button>`}</span></div>`}
         ${isProspect(p) ? `<div><span>Status</span><span><span class="tagline">Want to meet</span> <button class="glink" style="margin-left:8px" onclick="markMet('${p.id}')">Mark as met</button></span></div>` : ''}
         ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact('Firm',esc(p.firm))}${fact(isProspect(p)?'Via':'Met',esc(p.met))}
         ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('people')">${esc(g.name)}</button>`).join(', '))}
@@ -453,6 +454,19 @@ function addTalk(e, pid){ e.preventDefault(); const v = e.target.t.value.trim();
   setTimeout(() => { const i = document.querySelector(`form[onsubmit*="addTalk(event,'${pid}')"] input`); if(i) i.focus() }, 0) }
 function toggleTalk(pid, tid){ const p = P(pid), t = (p.talk||[]).find(x => x.id === tid); t.done = !t.done; touch(p); commit() }
 function delTalk(pid, tid){ const p = P(pid); p.talk = (p.talk||[]).filter(x => x.id !== tid); touch(p); commit() }
+function setCatchup(pid, on){ const p = P(pid); p.catchup = on; touch(p); commit(); toast(on ? `${p.first} added to catch-ups` : `${p.first} removed from catch-ups`) }
+function openCatchupPicker(){
+  ui.cq = '';
+  sheet(`<div class="title">Catch up<br>with…</div><div class="search" style="border-top:1px solid var(--ink)"><span class="mono grey">Search</span><input id="cq" placeholder="Name, team or firm" autocomplete="off" oninput="ui.cq=this.value;document.getElementById('cqlist').innerHTML=catchupList()"></div>
+    <div id="cqlist">${catchupList()}</div><div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet();render()">Done</button></div>`);
+  if(matchMedia('(min-width:900px)').matches) setTimeout(() => $('#cq').focus(), 50);
+}
+function catchupList(){
+  const q = norm(ui.cq||'');
+  const list = D.people.filter(p => !isProspect(p) && (!q || norm([fullName(p),p.team,p.firm,p.role].join(' ')).includes(q))).sort((a,b) => fullName(a).localeCompare(fullName(b)));
+  return list.map(p => `<div class="tmrow"><div class="prow" style="cursor:default">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small></div></div>
+    <button class="mono tmbtn" onclick="P('${p.id}').catchup=!P('${p.id}').catchup;touch(P('${p.id}'));idb.set('data',D);schedulePush();document.getElementById('cqlist').innerHTML=catchupList()">${p.catchup?'✓ Added':'+ Add'}</button></div>`).join('') || '<p class="emptyrow grey">No one matches.</p>';
+}
 function markMet(pid){ const p = P(pid); p.status = 'met'; touch(p); commit(); toast(`${p.first} moved to people you’ve met`) }
 
 function planCard(x){
@@ -471,19 +485,24 @@ views.plans = () => {
   const up = D.plans.filter(x => !x.done).sort((a,b) => a.t - b.t);
   const past = up.filter(x => x.t < now() - 2*3600e3), future = up.filter(x => x.t >= now() - 2*3600e3);
   const tm = D.people.filter(isProspect).sort((a,b) => fullName(a).localeCompare(fullName(b)));
+  const cu = D.people.filter(p => p.catchup && !isProspect(p)).sort((a,b) => fullName(a).localeCompare(fullName(b)));
+  const m = lastEntryMap();
+  const wantRow = (p, catchup) => { const pts = openTalk(p), nextPlan = plansFor(p.id)[0], last = m[p.id]; return `<div class="tmrow">
+      <button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small>
+        ${pts.length ? `<span class="snip"><span class="mono grey">${pts.length} to talk about</span> ${esc(pts[0].text)}${pts.length>1?'…':''}</span>` : catchup && last ? `<span class="snip"><span class="mono grey">Last ${esc(rel(last.t))}</span> ${esc(last.text.slice(0,70))}</span>` : p.met ? `<span class="snip"><span class="mono grey">${catchup?'Met':'Via'}</span> ${esc(p.met)}</span>` : ''}</div>
+        ${nextPlan ? `<span class="tagline">${esc(new Date(nextPlan.t).toLocaleDateString('en-AU',{day:'numeric',month:'short'}))}</span>` : ''}</button>
+      ${nextPlan ? '' : `<button class="mono tmbtn" onclick="openPlanSheet(null,'${p.id}')">Schedule</button>`}</div>` };
   return `
   <div class="bar mono"><span>Network / Plans</span><span class="grey">${pad(future.length)} upcoming</span></div>
   <div class="title">Plans</div>
-  <div class="btnrow pad" style="margin-top:0"><button class="btn" onclick="openPlanSheet()">+ Schedule a coffee</button><button class="btn ghost" onclick="openPersonSheet(null,null,'tomeet')">+ Someone to meet</button></div>
+  <div class="btnrow pad" style="margin-top:0"><button class="btn" onclick="openPlanSheet()">+ Schedule a coffee</button><button class="btn ghost" onclick="openCatchupPicker()">+ Catch up with…</button><button class="btn ghost" onclick="openPersonSheet(null,null,'tomeet')">+ Someone new to meet</button></div>
   ${past.length ? `<div class="sect mono" style="border-top:1px solid var(--ink)"><span>To log · how did it go?</span><span class="grey">${pad(past.length)}</span></div>${past.map(planCard).join('')}` : ''}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Upcoming</span><span class="grey">${pad(future.length)}</span></div>
   ${future.map(planCard).join('') || `<p class="emptyrow grey">Nothing scheduled. Plan a coffee with someone you want to get to know.</p>`}
+  <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Want to catch up</span><button class="grey" onclick="openCatchupPicker()">+ Add</button></div>
+  ${cu.map(p => wantRow(p, true)).join('') || `<p class="emptyrow grey">People you already know and want to see again. Tap “+ Add”, or “Want to catch up” on someone’s page.</p>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Want to meet</span><span class="grey">${pad(tm.length)}</span></div>
-  ${tm.map(p => { const pts = openTalk(p), nextPlan = plansFor(p.id)[0]; return `<div class="tmrow">
-      <button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small>
-        ${pts.length ? `<span class="snip"><span class="mono grey">${pts.length} to talk about</span> ${esc(pts[0].text)}${pts.length>1?'…':''}</span>` : p.met ? `<span class="snip"><span class="mono grey">Via</span> ${esc(p.met)}</span>` : ''}</div>
-        ${nextPlan ? `<span class="tagline">${esc(new Date(nextPlan.t).toLocaleDateString('en-AU',{day:'numeric',month:'short'}))}</span>` : ''}</button>
-      ${nextPlan ? '' : `<button class="mono tmbtn" onclick="openPlanSheet(null,'${p.id}')">Schedule</button>`}</div>` }).join('') || `<p class="emptyrow grey">Add people you’d like to meet: a partner in a team you’re curious about, a grad, a speaker. Jot down what to ask them.</p>`}`;
+  ${tm.map(p => wantRow(p, false)).join('') || `<p class="emptyrow grey">People you haven’t met yet: a partner in a team you’re curious about, a grad, a speaker. Jot down what to ask them.</p>`}`;
 };
 
 function openPlanSheet(id, pid){
@@ -702,7 +721,7 @@ function saveEntry(ev, id){
   if(!e){ e = {id:uid()}; D.log.push(e) }
   Object.assign(e, {text, people:[...ui.psel], t: fromDateInput(f.get('d'), e.t || now())}); touch(e);
   if(ui.fromPlan){ const x = D.plans.find(y => y.id === ui.fromPlan); if(x){ x.done = true; x.entry = e.id; touch(x) }
-    (e.people||[]).map(P).filter(p => p && isProspect(p)).forEach(p => { p.status = 'met'; touch(p) }); ui.fromPlan = null }
+    (e.people||[]).map(P).filter(Boolean).forEach(p => { if(isProspect(p)) p.status = 'met'; p.catchup = false; touch(p) }); ui.fromPlan = null }
   closeSheet(); commit(); toast(id ? 'Entry saved' : 'Logged');
 }
 function deleteEntry(id){ D.log = D.log.filter(e => e.id !== id); D.deleted[id] = now(); closeSheet(); commit(); toast('Entry deleted') }
@@ -712,6 +731,7 @@ function openAdd(){
     <button class="set" style="width:100%" onclick="closeSheet();openEntrySheet(null, ui.view==='person'?ui.person:null)"><div><b>Log entry</b><small>A coffee, a meeting, an event, and who was there</small></div><span class="mono grey">→</span></button>
     <button class="set" style="width:100%" onclick="closeSheet();openPlanSheet(null, ui.view==='person'?ui.person:null)"><div><b>Schedule a coffee</b><small>Coffee, lunch, a call, with talking points ready</small></div><span class="mono grey">→</span></button>
     <button class="set" style="width:100%" onclick="closeSheet();openPersonSheet(null,null,'tomeet')"><div><b>Someone to meet</b><small>A person you’d like to get to know, and what to ask them</small></div><span class="mono grey">→</span></button>
+    <button class="set" style="width:100%" onclick="closeSheet();ui.view==='person'?setCatchup(ui.person,true):openCatchupPicker()"><div><b>Someone to catch up with</b><small>A person you already know and want to see again</small></div><span class="mono grey">→</span></button>
     <button class="set" style="width:100%" onclick="closeSheet();openGroupSheet()"><div><b>New group</b><small>A cohort, a team, an event</small></div><span class="mono grey">→</span></button>
     <div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet()">Cancel</button></div>`);
 }
