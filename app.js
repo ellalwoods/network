@@ -191,7 +191,7 @@ function orbitSVG(){
   const C=210, R={1:78,2:132,3:186}, secs=sectors(), n=Math.max(secs.length,1), step=2*Math.PI/n, start=-Math.PI/2, col=colourOn();
   const secOf = p => { const g = (p.groups||[]).find(id => G(id)); return g || '_none' };
   const dimG = id => ui.filter !== 'all' && ui.filter !== id;
-  let s = `<svg class="orbit" viewBox="-60 -6 540 432" font-family="JetBrains Mono, monospace" role="img" aria-label="Orbit map of your network"><defs>`, body = '';
+  let s = `<svg class="orbit" viewBox="-64 -14 548 448" font-family="JetBrains Mono, monospace" role="img" aria-label="Orbit map of your network"><defs>`, body = '';
   if(col) secs.forEach((g,gi) => {
     const w = tones(g.pc ? gHex(g) : NOGROUP).wash, op = dimG(g.id) ? .35 : 1;
     if(n === 1){ body += `<circle cx="${C}" cy="${C}" r="196" fill="${w}"/>`; return }
@@ -202,16 +202,17 @@ function orbitSVG(){
   secs.forEach((g,gi) => {
     const a = start+gi*step;
     if(n > 1) body += `<line x1="${C+34*Math.cos(a)}" y1="${C+34*Math.sin(a)}" x2="${C+204*Math.cos(a)}" y2="${C+204*Math.sin(a)}" stroke="#D9D7D0" stroke-width=".8"/>`;
-    const m = n > 1 ? a+step/2 : start, cx = Math.cos(m), lx = C+203*cx, ly = C+(n>1?203:208)*Math.sin(m), anchor = cx > .35 ? 'start' : cx < -.35 ? 'end' : 'middle';
+    const m = n > 1 ? a+step/2 : start, cx = Math.cos(m), lx = C+212*cx, ly = C+(n>1?212:214)*Math.sin(m), anchor = cx > .35 ? 'start' : cx < -.35 ? 'end' : 'middle';
     const label = (g.short||g.name).toUpperCase().slice(0,16);
     body += `<text x="${lx}" y="${ly}" font-size="9" letter-spacing=".8" text-anchor="${anchor}" dominant-baseline="middle" fill="${col?tones(g.pc?gHex(g):NOGROUP).deep:'#111110'}" font-weight="${col?600:400}" opacity="${dimG(g.id)?.25:1}" style="cursor:pointer" onclick="setFilter(ui.filter==='${g.id}'?'all':'${g.id}')">${esc(label)}</text>`;
   });
   body += `<circle cx="${C}" cy="${C}" r="24" fill="#111110"/><text x="${C}" y="${C+1}" font-size="9" letter-spacing="1" text-anchor="middle" dominant-baseline="middle" fill="#FBFAF7">YOU</text>`;
   secs.forEach((g,gi) => [1,2,3].forEach(ring => {
     const ps = D.people.filter(p => !isProspect(p) && secOf(p) === g.id && (p.ring||3) === ring).sort((a,b) => (a.n||0)-(b.n||0));
-    const rr = Math.max(7, Math.min(15, (R[ring]*step)/(ps.length+1)/2.3));
+    const rr = Math.max(8, Math.min(15, (R[ring]*step)/(ps.length+1)/(ps.length > 6 ? 1.5 : 2.3)));
     ps.forEach((p,k) => {
-      const a = start+gi*step+step*(k+1)/(ps.length+1), x = +(C+R[ring]*Math.cos(a)).toFixed(1), y = +(C+R[ring]*Math.sin(a)).toFixed(1);
+      const crowd = ps.length > 6, rad = R[ring] + (crowd ? (k%2 ? -14 : 10) * (ring===1 ? .6 : 1) : 0);
+      const a = start+gi*step+step*(k+1)/(ps.length+1), x = +(C+rad*Math.cos(a)).toFixed(1), y = +(C+rad*Math.sin(a)).toFixed(1);
       const dim = ui.filter !== 'all' && !(p.groups||[]).includes(ui.filter) && !(ui.filter==='_none' && g.id==='_none');
       const t = tones(pHex(p)), d = photoOf(p);
       const fill = col ? [0,t.base,t.soft,'#FBFAF7'][ring] : '#FBFAF7';
@@ -222,7 +223,7 @@ function orbitSVG(){
         face = `<image href="${d}" x="${x-rr}" y="${y-rr}" width="${rr*2}" height="${rr*2}" clip-path="url(#c${p.id})" preserveAspectRatio="xMidYMid slice" opacity="${ring===3?.7:1}"/><circle cx="${x}" cy="${y}" r="${rr}" fill="none" stroke="${stroke}" stroke-width="${col?(ring===1?2.4:1.6):1}"/>`;
       } else face = `<circle class="face" cx="${x}" cy="${y}" r="${rr}" fill="${fill}" stroke="${stroke}" stroke-width="${col?1.2:1}"/><text class="ini" x="${x}" y="${y+.5}" font-size="${(rr*.6).toFixed(1)}" font-family="Archivo Black, sans-serif" text-anchor="middle" dominant-baseline="middle" fill="${txt}">${esc(ini(p))}</text>`;
       body += `<g class="node ${dim?'dim':''}" onclick="openPerson('${p.id}')"><title>${esc(fullName(p))}</title>${face}
-        ${rr >= 11 ? `<text x="${x}" y="${y+rr+11}" font-size="8" text-anchor="middle" fill="#8C8B86">${esc((p.first||'').toUpperCase().slice(0,12))}</text>` : ''}</g>`;
+        ${rr >= 11 && ps.length <= 6 ? `<text x="${x}" y="${y+rr+11}" font-size="8" text-anchor="middle" fill="#8C8B86">${esc((p.first||'').toUpperCase().slice(0,12))}</text>` : ''}</g>`;
     });
   }));
   return s + `</defs>` + body + `</svg>`;
@@ -714,7 +715,7 @@ function openPersonSheet(id, focus, status){
   const d = p && photoOf(p);
   sheet(`<form onsubmit="savePerson(event,${p?`'${p.id}'`:'null'})">
     <div class="title">${p?'Edit':'New'}<br>person</div>
-    <label class="photo" id="photoBox">${d?`<img src="${d}" alt="">`:'<span class="mono grey">+ Add photo</span>'}<input type="file" accept="image/*" hidden onchange="pickPhoto(this)"></label>
+    <label class="photo" id="photoBox">${d?`<img src="${d}" alt="">`:`<span class="mono grey">+ Add photo${matchMedia('(min-width:900px)').matches?' · or paste one':''}</span>`}<input type="file" accept="image/*" hidden onchange="pickPhoto(this)"></label>
     ${d?`<button type="button" class="link mono" style="margin:0 20px 6px" onclick="ui.photo=null;document.getElementById('photoBox').innerHTML='<span class=&quot;mono grey&quot;>Photo removed · tap to add</span><input type=&quot;file&quot; accept=&quot;image/*&quot; hidden onchange=&quot;pickPhoto(this)&quot;>'">Remove photo</button>`:''}
     <div class="two"><label class="fld"><span class="mono grey">First name</span><input name="first" value="${v('first')}" required autocomplete="off" autocapitalize="words"></label>
     <label class="fld"><span class="mono grey">Last name</span><input name="last" value="${v('last')}" autocomplete="off" autocapitalize="words"></label></div>
@@ -735,10 +736,18 @@ function openPersonSheet(id, focus, status){
   const f = focus === 'hook' ? $('#sheet [name=hook]') : (!p ? $('#sheet [name=first]') : null);
   if(f && matchMedia('(min-width:900px)').matches) f.focus(); else if(f && focus) f.focus();
 }
-async function pickPhoto(input){
-  const file = input.files && input.files[0]; if(!file) return;
+// paste a copied image (e.g. a LinkedIn profile photo) straight into the person form
+document.addEventListener('paste', async e => {
+  if(!$('#scrim').classList.contains('on') || !$('#photoBox')) return;
+  const item = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith('image/')); if(!item) return;
+  e.preventDefault(); await usePhotoFile(item.getAsFile()); toast('Photo pasted');
+});
+async function usePhotoFile(file){
   try{ ui.photo = await compress(file); $('#photoBox').innerHTML = `<img src="${ui.photo}" alt=""><input type="file" accept="image/*" hidden onchange="pickPhoto(this)">` }
   catch(e){ toast(e.message) }
+}
+async function pickPhoto(input){
+  const file = input.files && input.files[0]; if(file) return usePhotoFile(file);
 }
 function savePerson(e, id){
   e.preventDefault(); const f = new FormData(e.target), val = k => (f.get(k)||'').toString().trim();
