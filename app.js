@@ -863,10 +863,12 @@ const pendingPack = () => null;
 const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : '';
 // one-off tidy-ups for Ella's account
 function fixups(){
-  if(localStorage.getItem('fix-sydney')) return;
-  let changed = false;
-  D.groups.forEach(g => { if(norm(g.name).replace(/[^a-z]/g,'') === 'sydney'){ g.name = 'Allens Sydney'; if(!g.short || norm(g.short) === 'sydney') g.short = 'Allens Sydney'; touch(g); changed = true } });
-  if(changed){ localStorage.setItem('fix-sydney','1'); commit(); toast('Renamed “Sydney” to “Allens Sydney”') }
+  // anything labelled just "Sydney" becomes "Allens Sydney": group names and short labels, and people's team, firm and met fields
+  const isSyd = v => typeof v === 'string' && norm(v).replace(/[^a-z]/g,'') === 'sydney';
+  let n = 0;
+  D.groups.forEach(g => { let c = false; if(isSyd(g.name)){ g.name = 'Allens Sydney'; c = true } if(isSyd(g.short)){ g.short = 'Allens Sydney'; c = true } if(c){ touch(g); n++ } });
+  D.people.forEach(p => { let c = false; for(const k of ['team','firm','met','role']) if(isSyd(p[k])){ p[k] = 'Allens Sydney'; c = true } if(c){ touch(p); n++ } });
+  if(n){ commit(); toast(`Updated ${n} “Sydney” label${n>1?'s':''} to “Allens Sydney”`) }
 }
 async function autoPacks(){
   for(const k of PACKS){
