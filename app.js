@@ -154,6 +154,11 @@ const NAV = [['people','People'],['plans','Plans'],['log','Log'],['orbit','Orbit
 function go(v){ ui.view = v; render(); window.scrollTo(0,0) }
 function openPerson(id){ ui.person = id; go('person') }
 function setFilter(f){ ui.filter = f; render() }
+function openOrbitGroups(){
+  sheet(`<div class="title">Groups in<br>your orbit</div><p class="intro grey" style="padding-top:0">Adding a group puts everyone in it on your orbit. You can still remove individual people from their page.</p>
+    ${D.groups.map(g => `<div class="set"><div><b>${esc(g.name)}</b><small>${inG(g.id).length} people</small></div><button class="tog ${g.orbit?'on':''}" role="switch" aria-checked="${!!g.orbit}" aria-label="Show ${esc(g.name)} in orbit" onclick="setGroupOrbit('${g.id}',${!g.orbit});openOrbitGroups()"><i></i></button></div>`).join('') || '<p class="emptyrow grey">No groups yet.</p>'}
+    <div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet()">Done</button></div>`);
+}
 
 function renderNav(){
   const v = ui.view === 'person' || ui.view === 'cards' ? 'people' : ui.view;
@@ -182,14 +187,21 @@ const groupFilters = (cur, fn, extra='') => `<div class="filters"><button class=
 const today = () => new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
 
 /* ---------- orbit ---------- */
+// Orbit is opt-in: a person shows if added individually, or if one of their groups is added (unless removed individually)
+const viaGroup = p => (p.groups||[]).some(id => G(id) && G(id).orbit);
+const inOrbit = p => !isProspect(p) && (p.orbit === true || (p.orbit !== false && viaGroup(p)));
+const orbitPeople = () => D.people.filter(inOrbit);
+const secOf = p => (p.groups||[]).find(id => G(id) && G(id).orbit) || (p.groups||[]).find(id => G(id)) || '_none';
 function sectors(){
-  const s = [...D.groups];
-  if(D.people.some(p => !isProspect(p) && !(p.groups||[]).some(id => G(id)))) s.push({id:'_none', name:'No group', short:'Other', pc:null});
+  const used = new Set(orbitPeople().map(secOf));
+  const s = D.groups.filter(g => used.has(g.id));
+  if(used.has('_none')) s.push({id:'_none', name:'No group', short:'Other', pc:null});
   return s;
 }
+function setOrbit(pid, on){ const p = P(pid); p.orbit = on; if(on && !p.ring) p.ring = 3; touch(p); commit(); toast(on ? `${p.first} added to your orbit` : `${p.first} removed from your orbit`) }
+function setGroupOrbit(gid, on){ const g = G(gid); g.orbit = on; touch(g); commit(); toast(on ? `${g.name} added to your orbit` : `${g.name} removed from your orbit`) }
 function orbitSVG(){
   const C=210, R={1:78,2:132,3:186}, secs=sectors(), n=Math.max(secs.length,1), step=2*Math.PI/n, start=-Math.PI/2, col=colourOn();
-  const secOf = p => { const g = (p.groups||[]).find(id => G(id)); return g || '_none' };
   const dimG = id => ui.filter !== 'all' && ui.filter !== id;
   let s = `<svg class="orbit" viewBox="-64 -14 548 448" font-family="JetBrains Mono, monospace" role="img" aria-label="Orbit map of your network"><defs>`, body = '';
   if(col) secs.forEach((g,gi) => {
@@ -208,7 +220,7 @@ function orbitSVG(){
   });
   body += `<circle cx="${C}" cy="${C}" r="24" fill="#111110"/><text x="${C}" y="${C+1}" font-size="9" letter-spacing="1" text-anchor="middle" dominant-baseline="middle" fill="#FBFAF7">YOU</text>`;
   secs.forEach((g,gi) => [1,2,3].forEach(ring => {
-    const ps = D.people.filter(p => !isProspect(p) && secOf(p) === g.id && (p.ring||3) === ring).sort((a,b) => (a.n||0)-(b.n||0));
+    const ps = D.people.filter(p => inOrbit(p) && secOf(p) === g.id && (p.ring||3) === ring).sort((a,b) => (a.n||0)-(b.n||0));
     const rr = Math.max(8, Math.min(15, (R[ring]*step)/(ps.length+1)/(ps.length > 6 ? 1.5 : 2.3)));
     ps.forEach((p,k) => {
       const crowd = ps.length > 6, rad = R[ring] + (crowd ? (k%2 ? -14 : 10) * (ring===1 ? .6 : 1) : 0);
@@ -247,16 +259,21 @@ const fromDateInput = (v, fallback) => { if(!v) return fallback; const [y,m,d] =
 views.orbit = () => {
   const fol = D.people.filter(p => p.follow), recent = [...D.log].sort((a,b) => b.t - a.t).slice(0,5);
   const head = `<div class="bar mono"><span>Network / Orbit</span><button class="grey" onclick="go('settings')">Settings</button></div>`;
-  if(!D.people.length) return head + `<div class="title">Orbit</div><div class="empty"><p>Once you’ve added people, they’ll orbit around you here, grouped by context and placed closer the better you know them.</p><div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add a person</button></div></div>`;
+  const ops = orbitPeople(), secs = sectors();
+  if(ui.filter !== 'all' && !secs.some(g => g.id === ui.filter)) ui.filter = 'all';
+  const groupAdder = D.groups.filter(g => !g.orbit).map(g => `<button class="btn small ghost" onclick="setGroupOrbit('${g.id}',true)">+ ${esc(g.name)}</button>`).join('');
+  if(!ops.length) return head + `<div class="title">Orbit</div><div class="empty"><p>Your orbit is for the people who matter most: you choose who’s in it. Add a whole group, or open someone’s page and tap “Add to orbit”.</p>
+    ${groupAdder ? `<p class="mono grey" style="margin-top:22px">Add a group</p><div class="btnrow" style="margin-top:10px">${groupAdder}</div>` : ''}
+    <div class="btnrow"><button class="btn" onclick="go('people')">Choose people →</button></div></div>`;
   return head + `
   <div class="stats">
-    <button onclick="go('people')"><b>${pad(D.people.length)}</b><span class="mono grey">People</span></button>
-    <button onclick="go('groups')"><b>${pad(D.groups.length)}</b><span class="mono grey">Groups</span></button>
+    <button onclick="go('people')"><b>${pad(ops.length)}</b><span class="mono grey">In orbit · of ${D.people.length}</span></button>
+    <button onclick="go('groups')"><b>${pad(secs.length)}</b><span class="mono grey">Groups shown</span></button>
     <button onclick="go('log')"><b>${pad(D.log.length)}</b><span class="mono grey">Log entries</span></button>
   </div>
   <div class="orbitwrap">
     <div>
-      ${groupFilters(ui.filter,'setFilter').replace('class="filters"','class="filters" style="border-top:0"')}
+      <div class="filters" style="border-top:0"><button class="${ui.filter==='all'?'on':''}" onclick="setFilter('all')">All</button>${secs.filter(g=>g.id!=='_none').map(g => `<button class="${ui.filter===g.id?'on':''}" onclick="setFilter('${g.id}')">${colourOn()?`<i class="sw" style="background:${gHex(g)}"></i>`:''}${esc(g.short||g.name)}</button>`).join('')}<button onclick="openOrbitGroups()">+ Group</button></div>
       ${orbitSVG()}
       <div class="legend mono grey"><span><i class="lg-ring"></i>Inner ring = closer</span>${colourOn()?'<span><i class="lg-ring" style="border:0;background:linear-gradient(90deg,#AF005F,#F3D9E6)"></i>Brighter = closer</span>':''}<span>Tap a name to open</span></div>
     </div>
@@ -380,7 +397,8 @@ views.person = () => {
         ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact(isProspect(p)?'Via':'Met',esc(p.met))}
         ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('people')">${esc(g.name)}</button>`).join(', '))}
         ${fact('Email',p.email?link('mailto:'+p.email,p.email):'')}${fact('Phone',p.phone?link('tel:'+p.phone,p.phone):'')}${fact('LinkedIn',li?link(li,'Profile ↗'):'')}
-        <div><span>Orbit</span><span class="rings">${RINGS.map((l,k)=>`<button class="${(p.ring||3)===k+1?'on':''}" onclick="setRing('${p.id}',${k+1})">${l}</button>`).join('')}</span></div>
+        ${isProspect(p) ? '' : inOrbit(p) ? `<div><span>Orbit</span><span><span class="rings">${RINGS.map((l,k)=>`<button class="${(p.ring||3)===k+1?'on':''}" onclick="setRing('${p.id}',${k+1})">${l}</button>`).join('')}</span><button class="glink grey" style="margin-top:8px;display:block;font-size:13px" onclick="setOrbit('${p.id}',false)">Remove from orbit</button></span></div>`
+          : `<div><span>Orbit</span><span><button class="btn small ghost" onclick="setOrbit('${p.id}',true)">+ Add to orbit</button></span></div>`}
         ${fact('Added', p.created ? esc(dayLabel(p.created)) : '')}
       </div>
     </div>
@@ -410,7 +428,7 @@ views.groups = () => `
   <div style="border-top:1px solid var(--ink)">
   ${D.groups.map((g,i) => { const h = gHex(g); return `<div class="glrow" style="${colourOn()?`box-shadow:inset 6px 0 0 ${h};background:linear-gradient(90deg,${tones(h).wash},transparent 70%)`:''}">
       <button class="gl" onclick="ui.filter='${g.id}';go('people')"><span class="mono grey">${pad(i+1)}</span><b>${esc(g.name)}</b><span class="ct">${pad(inG(g.id).length)}</span></button>
-      <button class="mono grey gedit" onclick="startCards('${g.id}')">Cards</button><button class="mono grey gedit" onclick="openGroupSheet('${g.id}')">Edit</button></div>` }).join('')}
+      <button class="mono gedit ${g.orbit?'':'grey'}" onclick="setGroupOrbit('${g.id}',${!g.orbit})" title="${g.orbit?'Remove group from orbit':'Add group to orbit'}">${g.orbit?'● Orbit':'+ Orbit'}</button><button class="mono grey gedit" onclick="startCards('${g.id}')">Cards</button><button class="mono grey gedit" onclick="openGroupSheet('${g.id}')">Edit</button></div>` }).join('')}
   <button class="gl" onclick="openGroupSheet()"><span class="mono grey">+</span><b class="grey">New group</b><span></span></button></div>`;
 
 /* ---------- plans: people to meet, talking points, scheduled coffees ---------- */
@@ -710,7 +728,7 @@ function pickOne(el){ el.parentNode.querySelectorAll('.opt').forEach(b => b.clas
 function openPersonSheet(id, focus, status){
   const p = id ? P(id) : null; ui.status = p ? (p.status||'met') : (status || 'met');
   ui.sel = new Set(p ? (p.groups||[]).filter(g=>G(g)) : (ui.filter!=='all' && G(ui.filter) ? [ui.filter] : []));
-  ui.ring = p ? (p.ring||3) : 3; ui.photo = undefined;
+  ui.ring = p ? (inOrbit(p) ? (p.ring||3) : 0) : 0; ui.photo = undefined;
   const v = k => esc(p ? p[k]||'' : '');
   const d = p && photoOf(p);
   sheet(`<form onsubmit="savePerson(event,${p?`'${p.id}'`:'null'})">
@@ -723,7 +741,7 @@ function openPersonSheet(id, focus, status){
     <label class="fld"><span class="mono grey">Team</span><input name="team" value="${v('team')}" placeholder="Disputes" autocomplete="off"></label></div>
     <div class="fld"><span class="mono grey">Status</span><div class="opts">${[['met','Met'],['tomeet','Want to meet']].map(([k,l]) => `<button type="button" class="opt ${ui.status===k?'on':''}" onclick="ui.status='${k}';pickOne(this)">${l}</button>`).join('')}</div></div>
     <div class="fld"><span class="mono grey">Groups</span><div class="opts" id="chips">${chipsHTML()}</div></div>
-    <div class="fld"><span class="mono grey">Orbit · how well you know them</span><div class="opts">${RINGS.map((l,i)=>`<button type="button" class="opt ${ui.ring===i+1?'on':''}" onclick="ui.ring=${i+1};pickOne(this)">${l}</button>`).join('')}</div></div>
+    <div class="fld"><span class="mono grey">Orbit · how close you are</span><div class="opts">${['Not in orbit',...RINGS].map((l,i)=>`<button type="button" class="opt ${ui.ring===i?'on':''}" onclick="ui.ring=${i};pickOne(this)">${l}</button>`).join('')}</div></div>
     <label class="fld"><span class="mono grey">Where you met · or how you know of them</span><input name="met" value="${v('met')}" placeholder="Clerkship welcome drinks" autocomplete="off"></label>
     <label class="fld"><span class="mono grey">Memory hook</span><input name="hook" value="${v('hook')}" placeholder="One detail to remember them by" autocomplete="off"></label>
     <label class="fld"><span class="mono grey">Follow-up</span><input name="follow" value="${v('follow')}" placeholder="Optional, e.g. send thank-you note" autocomplete="off"></label>
@@ -754,7 +772,8 @@ function savePerson(e, id){
   let p = id ? P(id) : null;
   if(!p){ p = {id:uid(), n:Math.max(0,...D.people.map(x=>x.n||0))+1, created:now()}; D.people.push(p) }
   Object.assign(p, {first:val('first'), last:val('last'), role:val('role'), team:val('team'), met:val('met'), hook:val('hook'), follow:val('follow'),
-                    email:val('email'), phone:val('phone'), linkedin:val('linkedin'), groups:[...ui.sel], ring:ui.ring, status:ui.status||'met'});
+                    email:val('email'), phone:val('phone'), linkedin:val('linkedin'), groups:[...ui.sel], status:ui.status||'met'});
+  if(ui.ring){ p.ring = ui.ring; p.orbit = true } else if(p.orbit === true || viaGroup(p)) p.orbit = false;
   delete p.sample; touch(p);
   if(ui.photo !== undefined) setPhoto(p.id, ui.photo);
   closeSheet(); ui.person = p.id; ui.view = 'person'; commit(); toast(id ? 'Saved' : `${p.first} added`);
@@ -779,6 +798,7 @@ function openGroupSheet(id){
     <label class="fld"><span class="mono grey">Name</span><input name="name" value="${esc(g?g.name:'')}" placeholder="Summer clerkship 2026" required autocomplete="off"></label>
     <label class="fld"><span class="mono grey">Short label · for tabs and the orbit</span><input name="short" value="${esc(g?g.short:'')}" placeholder="Clerkship" maxlength="14" autocomplete="off"></label>
     <div class="fld"><span class="mono grey">Colour · used in colour mode</span><div class="swatches" style="justify-content:flex-start;max-width:none;margin-top:10px">${PALETTE.map(x=>`<button type="button" class="swb ${ui.gcolour===x.id?'on':''}" style="background:${x.hex}" title="${esc(x.firm+' · '+x.name)}" onclick="ui.gcolour='${x.id}';this.parentNode.querySelectorAll('.swb').forEach(b=>b.classList.remove('on'));this.classList.add('on')"></button>`).join('')}</div></div>
+    <label class="fld" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer"><span><span class="mono grey">Show in orbit</span><br><small class="grey">Everyone in this group appears on your orbit</small></span><input type="checkbox" name="orbit" ${g&&g.orbit?'checked':''} style="width:22px;height:22px;accent-color:#111110"></label>
     ${g?`<button type="button" class="link mono danger" style="margin:14px 20px 0" onclick="deleteGroup('${g.id}')">Delete group (people stay)</button>`:''}
     <div class="sheetbtns"><button type="button" onclick="closeSheet()">Cancel</button><button type="submit">${g?'Save':'Create'} →</button></div></form>`);
   if(!g) $('#sheet [name=name]').focus();
@@ -787,7 +807,7 @@ function saveGroup(e, id){
   e.preventDefault(); const f = new FormData(e.target); const name = f.get('name').toString().trim(); if(!name) return;
   const short = f.get('short').toString().trim();
   let g = id ? G(id) : newGroup(name, ui.gcolour);
-  g.name = name; g.short = short || (name.length <= 12 ? name : name.split(/\s+/)[0].slice(0,12)); g.pc = ui.gcolour; touch(g);
+  g.name = name; g.short = short || (name.length <= 12 ? name : name.split(/\s+/)[0].slice(0,12)); g.pc = ui.gcolour; g.orbit = !!f.get('orbit'); touch(g);
   closeSheet(); commit(); toast(id ? 'Group saved' : 'Group created');
 }
 function deleteGroup(id){
@@ -844,7 +864,7 @@ function loadSamples(){
   const at = (d,h) => { const x = new Date(now()+d*DAY); x.setHours(h,0,0,0); return x.getTime() };
   D.plans.push(touch({id:uid(), kind:'Coffee', people:[pr.id], t:at(2,9), place:'Cafe downstairs', notes:'She suggested it after the team lunch', done:false, sample:true}));
   D.plans.push(touch({id:uid(), kind:'Coffee', people:[z.id], t:at(8,15), place:'', notes:'Emailed her assistant to book', done:false, sample:true}));
-  [gC,gP,gD,gM].forEach(g => g.sample = true);
+  [gC,gP,gD,gM].forEach(g => { g.sample = true; g.orbit = true });
   commit(); toast('Sample people added');
 }
 function removeSamples(){
