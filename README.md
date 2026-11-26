@@ -42,5 +42,6 @@ Sign-in works the same way as Duo Logo and DuoVino: **name + planet + constellat
 | `config.js` | Supabase URL and anon key |
 | `sw.js`, `manifest.json`, `icons/` | Home-screen install and offline support |
 | `supabase/rolo.sql` | Database tables and functions |
+| `vendor/mediapipe/` | On-device face detector (MediaPipe, Apache 2.0) used to centre photos on faces |
 | `mockup/` | The design mockups and earlier directions |
 | `docs/screenshots/` | Screenshots of the built app |

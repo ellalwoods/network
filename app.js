@@ -84,12 +84,55 @@ const touch = x => { x.u = now(); return x };
 function commit(){ idb.set('data', D); render(); schedulePush() }
 
 /* ---------- photos ---------- */
-function compress(file){
-  return new Promise((res,rej) => { const img = new Image(); const url = URL.createObjectURL(file);
-    img.onload = () => { const S=420, c=document.createElement('canvas'); c.width=c.height=S; const s=Math.min(img.width,img.height);
-      c.getContext('2d').drawImage(img,(img.width-s)/2,(img.height-s)*.3,s,s,0,0,S,S); URL.revokeObjectURL(url); res(c.toDataURL('image/jpeg',.82)) };
-    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not read that image')) };
-    img.src = url });
+// Face-centred photos: the bundled MediaPipe face detector (vendor/mediapipe) finds the face on this device,
+// and the photo is cropped to a square around it, so every little circle shows the face.
+let faceDet = null;
+async function findFace(img){
+  try{
+    if(!faceDet){
+      const v = await import('./vendor/mediapipe/vision_bundle.mjs');
+      const files = await v.FilesetResolver.forVisionTasks(new URL('vendor/mediapipe/wasm', location.href).href);
+      faceDet = await v.FaceDetector.createFromOptions(files, {baseOptions:{modelAssetPath:new URL('vendor/mediapipe/blaze_face_short_range.tflite', location.href).href}, runningMode:'IMAGE', minDetectionConfidence:.5});
+    }
+    const best = r => (r.detections || []).map(d => ({...d.boundingBox, score:(d.categories&&d.categories[0]&&d.categories[0].score)||0})).sort((a,b) => b.width*b.height - a.width*a.height)[0];
+    let f = best(faceDet.detect(img)); if(f) return f;
+    // the model is tuned for close-ups, so if the face is small, look again in zoomed-in, overlapping windows
+    const W = img.naturalWidth, H = img.naturalHeight, c = document.createElement('canvas'), ctx = c.getContext('2d');
+    for(const frac of [.5, .33]){
+      const s = Math.round(Math.min(W,H) * frac * (W > H ? 1.2 : 1)), step = s * .5; let found = null;
+      for(let y = 0; y + s <= H + 1 && !found; y += step) for(let x = 0; x + s <= W + 1; x += step){
+        const w = Math.min(s, W - x), h = Math.min(s, H - y); c.width = w; c.height = h; ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
+        const g = best(faceDet.detect(c)); if(g && (!found || g.score > found.score)) found = {...g, originX:g.originX + x, originY:g.originY + y};
+      }
+      if(found) return found;
+    }
+    return null;
+  }catch(e){ console.warn('face detection unavailable', e); return null }
+}
+function cropBox(W, H, f){
+  if(!f) { const s = Math.min(W,H); return {sx:(W-s)/2, sy:(H-s)*.3, s} }            // no face found: centre, slightly high
+  let s = Math.min(Math.max(f.width, f.height) * 2.3, W, H);                          // head and a little shoulder
+  const cx = f.originX + f.width/2, cy = f.originY + f.height*.58;
+  return {sx: Math.max(0, Math.min(W - s, cx - s/2)), sy: Math.max(0, Math.min(H - s, cy - s/2)), s};
+}
+const loadImg = src => new Promise((res,rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Could not read that image')); i.src = src });
+async function cropToFace(img){
+  const W = img.naturalWidth, H = img.naturalHeight, f = await findFace(img), {sx, sy, s} = cropBox(W, H, f);
+  const S = 420, c = document.createElement('canvas'); c.width = c.height = S;
+  c.getContext('2d').drawImage(img, sx, sy, s, s, 0, 0, S, S);
+  return {d: c.toDataURL('image/jpeg', .84), face: !!f};
+}
+async function compress(file){
+  const url = URL.createObjectURL(file);
+  try{ return (await cropToFace(await loadImg(url))).d } finally { URL.revokeObjectURL(url) }
+}
+async function recentrePhotos(){
+  const ids = Object.keys(PH).filter(id => PH[id] && PH[id].d && P(id)); if(!ids.length) return toast('No photos yet');
+  toast('Finding faces…'); let n = 0;
+  for(const id of ids){ const img = await loadImg(PH[id].d), f = await findFace(img); if(!f) continue;
+    const {s} = cropBox(img.naturalWidth, img.naturalHeight, f); if(s > img.naturalWidth * .92) continue;   // already framed on the face
+    setPhoto(id, (await cropToFace(img)).d); n++ }
+  commit(); toast(n ? `Centred ${n} photo${n>1?'s':''} on faces` : 'Photos already look centred');
 }
 function setPhoto(id, d){ PH[id] = {d, t:now()}; idb.set('ph:'+id, PH[id]) }
 const photoOf = p => PH[p.id] && PH[p.id].d;
@@ -608,6 +651,7 @@ views.settings = () => {
     <button class="set" style="width:100%" onclick="confirmSwitch()"><div><b>Switch account</b><small>Signs out and clears this device.</small></div><span class="mono grey">→</span></button>`
     : `<button class="set" style="width:100%" onclick="startLogin('signin')"><div><b>Sign in to sync</b><small>Name + planet + constellation</small></div><span class="mono grey">→</span></button>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
+  <button class="set" style="width:100%" onclick="recentrePhotos()"><div><b>Centre photos on faces</b><small>Re-crops photos you’ve already added so the circles show their face</small></div><span class="mono grey">◎</span></button>
   <button class="set" style="width:100%" onclick="exportData()"><div><b>Export backup</b><small>Download everyone, notes and photos as a file</small></div><span class="mono grey">↓</span></button>
   <label class="set" style="cursor:pointer"><div><b>Import backup</b><small>Merge a Network backup file into this orbit</small></div><span class="mono grey">↑</span><input type="file" accept="application/json,.json" hidden onchange="importData(this)"></label>
   ${samples ? `<button class="set" style="width:100%" onclick="removeSamples()"><div><b>Remove sample people</b><small>${samples} sample ${samples===1?'person':'people'}</small></div><span class="mono grey">×</span></button>` : ''}
