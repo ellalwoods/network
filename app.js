@@ -328,7 +328,8 @@ function listHTML(){
 }
 views.people = () => {
   const fol = D.people.filter(p => p.follow).length;
-  if(!D.people.length) return `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>
+  const pk = pendingPack(), packBar = pk ? `<button class="composer" onclick="openPackSheet('${pk.file}')"><span><b>${esc(pk.label)}</b> <span class="grey">· ${pk.count} people ready to add</span></span><span class="mono">Add →</span></button>` : '';
+  if(!D.people.length) return `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>${packBar}
     <div class="title">Your<br>people</div>
     <div class="empty"><p>A notebook of everyone you meet: who they are, where you met, and what you talked about. Add someone, then log what happens.</p>
       <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
@@ -336,6 +337,7 @@ views.people = () => {
   return `
   <div class="bar mono"><span>${today()}</span><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
   <div class="title">People</div>
+  ${packBar}
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
   <div class="search"><span class="mono grey">Search</span><input id="q" value="${esc(ui.q)}" placeholder="Name, team, or anything you wrote" oninput="ui.q=this.value;document.getElementById('list').innerHTML=listHTML()" autocomplete="off"></div>
   <div class="toolbar"><div class="seg">${SORTS.map(([k,l]) => `<button class="${ui.sort===k?'on':''}" onclick="setSort('${k}')">${l}</button>`).join('')}</div>
@@ -586,6 +588,7 @@ views.settings = () => {
     : `<button class="set" style="width:100%" onclick="startLogin('signin')"><div><b>Sign in to sync</b><small>Name + planet + constellation</small></div><span class="mono grey">→</span></button>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
   <button class="set" style="width:100%" onclick="exportData()"><div><b>Export backup</b><small>Download everyone, notes and photos as a file</small></div><span class="mono grey">↓</span></button>
+  ${PACKS.map(k => `<button class="set" style="width:100%" onclick="openPackSheet('${k.file}')"><div><b>Add ${esc(k.label)}</b><small>${k.count} people · needs the passcode</small></div><span class="mono grey">+</span></button>`).join('')}
   <label class="set" style="cursor:pointer"><div><b>Import backup</b><small>Merge a Network backup file into this orbit</small></div><span class="mono grey">↑</span><input type="file" accept="application/json,.json" hidden onchange="importData(this)"></label>
   ${samples ? `<button class="set" style="width:100%" onclick="removeSamples()"><div><b>Remove sample people</b><small>${samples} sample ${samples===1?'person':'people'}</small></div><span class="mono grey">×</span></button>` : ''}
   <p class="intro grey" style="padding-top:20px;padding-bottom:40px">To install: on iPhone, tap Share → Add to Home Screen. On a laptop, use the install icon in the address bar.</p>`;
@@ -830,6 +833,29 @@ async function importData(input){
     for(const [id,l] of Object.entries(j.photos||{})) if(!PH[id] || PH[id].t < l.t){ PH[id] = l; await idb.set('ph:'+id, l) }
     commit(); toast('Backup imported');
   }catch(e){ toast('That isn’t a Network backup file') }
+}
+// Encrypted starter packs (kept encrypted because this repo and site are public)
+const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', label:'Allens summer clerks 2026', count:33}];
+const pendingPack = () => PACKS.find(k => !G(k.group) && !localStorage.getItem('pack-hide-'+k.group));
+function openPackSheet(file){
+  const k = PACKS.find(x => x.file === file);
+  sheet(`<form onsubmit="importPack(event,'${file}')"><div class="title">Add<br>${k.count} people</div>
+    <p class="intro" style="padding-top:0">${esc(k.label)}. Enter the passcode Claude gave you.</p>
+    <label class="fld"><span class="mono grey">Passcode</span><input name="code" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="clerks-0000" required></label>
+    <p class="msg" id="packmsg" style="display:none"></p>
+    <button type="button" class="link mono" style="margin:12px 20px 0" onclick="localStorage.setItem('pack-hide-${k.group}','1');closeSheet();render()">Don’t show this again</button>
+    <div class="sheetbtns"><button type="button" onclick="closeSheet()">Cancel</button><button type="submit">Add them →</button></div></form>`);
+  setTimeout(() => $('#sheet [name=code]').focus(), 50);
+}
+async function importPack(e, file){
+  e.preventDefault(); const code = new FormData(e.target).get('code').toString().trim().toLowerCase(), msg = $('#packmsg');
+  try{
+    const j = await (await fetch(file, {cache:'no-store'})).json(), b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b(j.salt), iterations:200000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+    const pack = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM', iv:b(j.iv)}, key, b(j.ct))));
+    D = merge(D, pack.data); closeSheet(); ui.view = 'people'; commit(); toast(`${j.count} people added`);
+  }catch(err){ msg.style.display = ''; msg.textContent = 'That passcode didn’t work. Check it and try again.' }
 }
 function loadSamples(){
   const mk = (name, pc) => D.groups.find(g => norm(g.name) === norm(name)) || newGroup(name, pc);
