@@ -6,6 +6,7 @@ Network is a personal app for remembering the people you meet at work. It's a st
   - Browse A–Z, by most recent, by team or by group, as a list or a grid.
   - Search covers everything you've written.
   - Each person has a page with their photo, details, memory hook and follow-up, and you can flip to the previous or next person.
+- **Plans:** people you want to meet, talking points to raise with them (also shown on their page), and scheduled coffees, lunches or calls. Each plan can be added to your phone's calendar, and when it's done you can log how it went.
 - **Log:** a dated diary of what happened and who was there. One entry can tag several people, and it also shows on each of their pages.
 - **Orbit:** your network as a map with you at the centre. People are grouped by context and sit closer the better you know them.
 - **Groups:** custom groups (a cohort, a team, an event), and a person can be in several.

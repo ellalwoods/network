@@ -49,6 +49,7 @@ Rolo is a personal app for remembering the people you meet at work. It is a webs
 1. ✅ Clickable mockup, design direction and plan.
 2. ✅ v1 app, built around the people notebook:
    - People (A–Z, recent, team or group; list or grid; search; previous/next on person pages)
+   - Plans: people to meet, talking points, scheduled coffees, add to calendar, log it afterwards
    - Log diary (entries can tag several people)
    - Orbit map and Groups
    - Simple flashcards (no spaced repetition)

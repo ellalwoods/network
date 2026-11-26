@@ -61,7 +61,7 @@ const idb = (() => {
 })();
 
 /* ---------- state ---------- */
-const blank = () => ({v:1, people:[], groups:[], log:[], deleted:{}, settings:{colour:false,u:0}});
+const blank = () => ({v:1, people:[], groups:[], log:[], plans:[], deleted:{}, settings:{colour:false,u:0}});
 let D = blank();          // synced document
 let PH = {};              // person id -> {d: dataURL|null, t: updated ms}
 let acct = null;          // {label, key}; label stays on this device only
@@ -111,7 +111,7 @@ function mergeList(a, b, del){
 function merge(L, R){
   const del = {...(R.deleted||{})};
   for(const [k,v] of Object.entries(L.deleted||{})) del[k] = Math.max(v, del[k]||0);
-  return {v:1, deleted:del, people:mergeList(L.people,R.people,del), groups:mergeList(L.groups,R.groups,del), log:mergeList(L.log,R.log,del),
+  return {v:1, deleted:del, people:mergeList(L.people,R.people,del), groups:mergeList(L.groups,R.groups,del), log:mergeList(L.log,R.log,del), plans:mergeList(L.plans,R.plans,del),
           settings: ((R.settings&&R.settings.u)||0) > ((L.settings&&L.settings.u)||0) ? R.settings : (L.settings||blank().settings)};
 }
 
@@ -150,7 +150,7 @@ async function syncNow(){
 function paintSync(){ const el = $('#syncdot'); if(el) el.dataset.s = sync.state }
 
 /* ---------- navigation ---------- */
-const NAV = [['people','People'],['log','Log'],['orbit','Orbit'],['groups','Groups']];
+const NAV = [['people','People'],['plans','Plans'],['log','Log'],['orbit','Orbit'],['groups','Groups']];
 function go(v){ ui.view = v; render(); window.scrollTo(0,0) }
 function openPerson(id){ ui.person = id; go('person') }
 function setFilter(f){ ui.filter = f; render() }
@@ -164,9 +164,9 @@ function renderNav(){
     `<div class="mono grey" style="padding:22px 20px 8px">Groups</div>` +
     D.groups.map(g => `<button class="grp" onclick="ui.filter='${g.id}';go('people')"><span>${sw(g)}${esc(g.name)}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
     `<button class="grp grey" onclick="openGroupSheet()"><span>+ New group</span><span></span></button>` +
-    `<button class="navbtn ${v==='settings'?'on':''}" style="margin-top:auto;border-top:1px solid var(--soft)" onclick="go('settings')"><span>Settings</span><span>05</span></button>` +
+    `<button class="navbtn ${v==='settings'?'on':''}" style="margin-top:auto;border-top:1px solid var(--soft)" onclick="go('settings')"><span>Settings</span><span>06</span></button>` +
     `<button class="newbtn" onclick="openAdd()">+ Add</button>`;
-  $('#tabbar').innerHTML = NAV.map(([k,l]) => `<button class="${v===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('') +
+  $('#tabbar').innerHTML = NAV.slice(0,4).map(([k,l]) => `<button class="${v===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('') +
     `<button class="add" onclick="openAdd()" aria-label="Add">+</button>`;
   $('#tabbar').style.display = ui.view === 'login' ? 'none' : '';
 }
@@ -184,7 +184,7 @@ const today = () => new Date().toLocaleDateString('en-AU',{weekday:'short',day:'
 /* ---------- orbit ---------- */
 function sectors(){
   const s = [...D.groups];
-  if(D.people.some(p => !(p.groups||[]).some(id => G(id)))) s.push({id:'_none', name:'No group', short:'Other', pc:null});
+  if(D.people.some(p => !isProspect(p) && !(p.groups||[]).some(id => G(id)))) s.push({id:'_none', name:'No group', short:'Other', pc:null});
   return s;
 }
 function orbitSVG(){
@@ -208,7 +208,7 @@ function orbitSVG(){
   });
   body += `<circle cx="${C}" cy="${C}" r="24" fill="#111110"/><text x="${C}" y="${C+1}" font-size="9" letter-spacing="1" text-anchor="middle" dominant-baseline="middle" fill="#FBFAF7">YOU</text>`;
   secs.forEach((g,gi) => [1,2,3].forEach(ring => {
-    const ps = D.people.filter(p => secOf(p) === g.id && (p.ring||3) === ring).sort((a,b) => (a.n||0)-(b.n||0));
+    const ps = D.people.filter(p => !isProspect(p) && secOf(p) === g.id && (p.ring||3) === ring).sort((a,b) => (a.n||0)-(b.n||0));
     const rr = Math.max(7, Math.min(15, (R[ring]*step)/(ps.length+1)/2.3));
     ps.forEach((p,k) => {
       const a = start+gi*step+step*(k+1)/(ps.length+1), x = +(C+R[ring]*Math.cos(a)).toFixed(1), y = +(C+R[ring]*Math.sin(a)).toFixed(1);
@@ -275,7 +275,7 @@ function setSort(s){ ui.sort = s; localStorage.setItem('rolo-sort', s); render()
 function setLayout(l){ ui.layout = l; localStorage.setItem('rolo-layout', l); render() }
 function filteredPeople(){
   const q = norm(ui.q), m = lastEntryMap();
-  const text = p => norm([p.first,p.last,p.team,p.role,p.hook,p.met,p.follow,p.email,...entriesFor(p.id).map(e=>e.text),...(p.groups||[]).map(id=>G(id)?.name)].join(' '));
+  const text = p => norm([p.first,p.last,p.team,p.role,p.hook,p.met,p.follow,p.email,...(p.talk||[]).map(t=>t.text),...entriesFor(p.id).map(e=>e.text),...(p.groups||[]).map(id=>G(id)?.name)].join(' '));
   const list = D.people.filter(p => (ui.filter==='all' || (p.groups||[]).includes(ui.filter)) && (!q || text(p).includes(q)));
   return ui.sort === 'recent' ? list.sort((a,b) => lastAct(b,m) - lastAct(a,m)) : list.sort((a,b) => fullName(a).localeCompare(fullName(b)));
 }
@@ -291,7 +291,7 @@ function personRow(p, m){
   const e = m[p.id];
   return `<button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small>
     ${e ? `<span class="snip"><span class="mono grey">${esc(rel(e.t))}</span> ${esc(e.text.slice(0,90))}</span>` : p.met ? `<span class="snip"><span class="mono grey">Met</span> ${esc(p.met)}</span>` : ''}</div>
-    ${p.follow ? `<span class="tagline" ${tagStyle(p)}>Follow up</span>` : ''}</button>`;
+    ${isProspect(p) ? `<span class="tagline">To meet</span>` : p.follow ? `<span class="tagline" ${tagStyle(p)}>Follow up</span>` : ''}</button>`;
 }
 function personCard(p){
   return `<button class="pcard" onclick="openPerson('${p.id}')">${faceBox(p,'pc-face')}<b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small></button>`;
@@ -316,7 +316,7 @@ views.people = () => {
       <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
       <button class="link mono" onclick="loadSamples()">Or explore with sample people →</button></div>`;
   return `
-  <div class="bar mono"><span>${today()}</span><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
+  <div class="bar mono"><span>${today()}</span><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
   <div class="title">People</div>
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
   <div class="search"><span class="mono grey">Search</span><input id="q" value="${esc(ui.q)}" placeholder="Name, team, or anything you wrote" oninput="ui.q=this.value;document.getElementById('list').innerHTML=listHTML()" autocomplete="off"></div>
@@ -375,7 +375,8 @@ views.person = () => {
       ${faceBox(p,'portrait')}
       <div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
       <div class="facts">
-        ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact('Met',esc(p.met))}
+        ${isProspect(p) ? `<div><span>Status</span><span><span class="tagline">Want to meet</span> <button class="glink" style="margin-left:8px" onclick="markMet('${p.id}')">Mark as met</button></span></div>` : ''}
+        ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact(isProspect(p)?'Via':'Met',esc(p.met))}
         ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('people')">${esc(g.name)}</button>`).join(', '))}
         ${fact('Email',p.email?link('mailto:'+p.email,p.email):'')}${fact('Phone',p.phone?link('tel:'+p.phone,p.phone):'')}${fact('LinkedIn',li?link(li,'Profile ↗'):'')}
         <div><span>Orbit</span><span class="rings">${RINGS.map((l,k)=>`<button class="${(p.ring||3)===k+1?'on':''}" onclick="setRing('${p.id}',${k+1})">${l}</button>`).join('')}</span></div>
@@ -384,14 +385,18 @@ views.person = () => {
     </div>
     <div>
       <div class="hook" ${col?`style="background:${t.wash}"`:''}><span class="mono grey">Memory hook</span><p>${p.hook ? esc(p.hook) : `<button class="grey" onclick="openPersonSheet('${p.id}','hook')">+ Add something to remember them by</button>`}</p></div>
-      <div class="hook"><span class="mono grey">Follow-up</span>
+      <div class="sect mono"><span>To talk about</span><span class="grey">${pad(openTalk(p).length)}</span></div>
+      ${talkHTML(p)}
+      <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Plans</span><button class="grey" onclick="openPlanSheet(null,'${p.id}')">+ Schedule</button></div>
+      ${plansFor(p.id).map(planCard).join('') || `<p class="emptyrow grey">Nothing scheduled with ${esc(p.first||'them')}.</p>`}
+      <div class="hook" style="border-top:1px solid var(--ink);margin-top:-1px"><span class="mono grey">Follow-up</span>
         ${p.follow ? `<p>${esc(p.follow)}</p><button class="btn small" style="margin-top:12px" onclick="doneFollow('${p.id}')">✓ Done</button>`
           : `<form class="inline" onsubmit="setFollow(event,'${p.id}')"><input name="f" placeholder="e.g. Coffee in December" autocomplete="off"><button class="mono">Set</button></form>`}
       </div>
       <div class="sect mono"><span>Log</span><span class="grey">${pad(entries.length)}</span></div>
       <form class="inline note-add" onsubmit="quickEntry(event,'${p.id}')"><input name="t" placeholder="Log something about ${esc(p.first||'them')}…" autocomplete="off"><button class="mono">Add</button><button type="button" class="mono grey" onclick="openEntrySheet(null,'${p.id}',this.form.t.value)">More</button></form>
       ${entries.map(e => entryHTML(e, {except:p.id})).join('')}
-      ${p.created ? `<div class="entry auto"><span class="mono grey e-date">${esc(dayLabel(p.created))}</span><div class="e-body"><p class="grey">Added to Network${p.met?` · met at ${esc(p.met)}`:''}</p></div></div>` : ''}
+      ${p.created ? `<div class="entry auto"><span class="mono grey e-date">${esc(dayLabel(p.created))}</span><div class="e-body"><p class="grey">Added to Network${p.met?` · ${isProspect(p)?'via':'met at'} ${esc(p.met)}`:''}</p></div></div>` : ''}
     </div>
   </div>`;
 };
@@ -407,10 +412,103 @@ views.groups = () => `
       <button class="mono grey gedit" onclick="startCards('${g.id}')">Cards</button><button class="mono grey gedit" onclick="openGroupSheet('${g.id}')">Edit</button></div>` }).join('')}
   <button class="gl" onclick="openGroupSheet()"><span class="mono grey">+</span><b class="grey">New group</b><span></span></button></div>`;
 
+/* ---------- plans: people to meet, talking points, scheduled coffees ---------- */
+const KINDS = ['Coffee','Lunch','Drinks','Call','Meeting','Event'];
+const isProspect = p => p.status === 'tomeet';
+const plansFor = pid => D.plans.filter(x => (x.people||[]).includes(pid) && !x.done).sort((a,b) => a.t - b.t);
+const timeLabel = t => new Date(t).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'}).replace(' ','').toLowerCase();
+const dtInput = t => `${dateInput(t)}T${String(new Date(t).getHours()).padStart(2,'0')}:${String(new Date(t).getMinutes()).padStart(2,'0')}`;
+const planTitle = x => `${x.kind||'Catch-up'}${(x.people||[]).length ? ' with ' + (x.people||[]).map(P).filter(Boolean).map(p => p.first||fullName(p)).join(', ') : ''}`;
+const openTalk = p => (p.talk||[]).filter(t => !t.done);
+
+function talkHTML(p){
+  const items = p.talk || [];
+  return `<div class="talk">${items.map(t => `<div class="titem ${t.done?'done':''}"><button class="tick" onclick="toggleTalk('${p.id}','${t.id}')" aria-label="${t.done?'Mark not discussed':'Mark discussed'}">${t.done?'✓':''}</button><span>${esc(t.text)}</span><button class="x" onclick="delTalk('${p.id}','${t.id}')" title="Remove">×</button></div>`).join('')}
+    <form class="inline" onsubmit="addTalk(event,'${p.id}')"><input name="t" placeholder="+ Something to ask or talk about" autocomplete="off"><button class="mono">Add</button></form></div>`;
+}
+function addTalk(e, pid){ e.preventDefault(); const v = e.target.t.value.trim(); if(!v) return; const p = P(pid); (p.talk = p.talk||[]).push({id:uid(), text:v, done:false}); touch(p); commit();
+  setTimeout(() => { const i = document.querySelector(`form[onsubmit*="addTalk(event,'${pid}')"] input`); if(i) i.focus() }, 0) }
+function toggleTalk(pid, tid){ const p = P(pid), t = (p.talk||[]).find(x => x.id === tid); t.done = !t.done; touch(p); commit() }
+function delTalk(pid, tid){ const p = P(pid); p.talk = (p.talk||[]).filter(x => x.id !== tid); touch(p); commit() }
+function markMet(pid){ const p = P(pid); p.status = 'met'; touch(p); commit(); toast(`${p.first} moved to people you’ve met`) }
+
+function planCard(x){
+  const d = new Date(x.t), ps = (x.people||[]).map(P).filter(Boolean), past = x.t < now() - 2*3600e3;
+  const pts = ps.flatMap(p => openTalk(p).map(t => ({p, t})));
+  return `<div class="plan ${past?'past':''}">
+    <button class="pdate" onclick="openPlanSheet('${x.id}')"><b>${d.getDate()}</b><span class="mono">${d.toLocaleDateString('en-AU',{month:'short'})}</span><span class="mono grey">${d.toLocaleDateString('en-AU',{weekday:'short'})}</span></button>
+    <div class="pbody"><button class="ptitle" onclick="openPlanSheet('${x.id}')"><b>${esc(planTitle(x))}</b><small class="mono grey">${esc(timeLabel(x.t))}${x.place?` · ${esc(x.place)}`:''}</small></button>
+      ${ps.length ? `<div class="pchips">${ps.map(p => `<button class="pchip" onclick="openPerson('${p.id}')">${faceBox(p,'mini')}${esc(p.first||fullName(p))}</button>`).join('')}</div>` : ''}
+      ${x.notes ? `<p class="pnotes">${esc(x.notes)}</p>` : ''}
+      ${pts.length ? `<ul class="ppts">${pts.slice(0,5).map(({p,t}) => `<li>${ps.length>1?`<span class="mono grey">${esc(p.first)}</span> `:''}${esc(t.text)}</li>`).join('')}${pts.length>5?`<li class="grey">+ ${pts.length-5} more</li>`:''}</ul>` : ''}
+      <div class="pacts">${past ? `<button class="btn small" onclick="logPlan('${x.id}')">How did it go? Log it →</button>` : `<button class="btn small ghost" onclick="downloadICS('${x.id}')">+ Calendar</button><button class="btn small ghost" onclick="logPlan('${x.id}')">Done · log it</button>`}</div>
+    </div></div>`;
+}
+views.plans = () => {
+  const up = D.plans.filter(x => !x.done).sort((a,b) => a.t - b.t);
+  const past = up.filter(x => x.t < now() - 2*3600e3), future = up.filter(x => x.t >= now() - 2*3600e3);
+  const tm = D.people.filter(isProspect).sort((a,b) => fullName(a).localeCompare(fullName(b)));
+  return `
+  <div class="bar mono"><span>Network / Plans</span><span class="grey">${pad(future.length)} upcoming</span></div>
+  <div class="title">Plans</div>
+  <div class="btnrow pad" style="margin-top:0"><button class="btn" onclick="openPlanSheet()">+ Schedule a coffee</button><button class="btn ghost" onclick="openPersonSheet(null,null,'tomeet')">+ Someone to meet</button></div>
+  ${past.length ? `<div class="sect mono" style="border-top:1px solid var(--ink)"><span>To log · how did it go?</span><span class="grey">${pad(past.length)}</span></div>${past.map(planCard).join('')}` : ''}
+  <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Upcoming</span><span class="grey">${pad(future.length)}</span></div>
+  ${future.map(planCard).join('') || `<p class="emptyrow grey">Nothing scheduled. Plan a coffee with someone you want to get to know.</p>`}
+  <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Want to meet</span><span class="grey">${pad(tm.length)}</span></div>
+  ${tm.map(p => { const pts = openTalk(p), nextPlan = plansFor(p.id)[0]; return `<div class="tmrow">
+      <button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small>
+        ${pts.length ? `<span class="snip"><span class="mono grey">${pts.length} to talk about</span> ${esc(pts[0].text)}${pts.length>1?'…':''}</span>` : p.met ? `<span class="snip"><span class="mono grey">Via</span> ${esc(p.met)}</span>` : ''}</div>
+        ${nextPlan ? `<span class="tagline">${esc(new Date(nextPlan.t).toLocaleDateString('en-AU',{day:'numeric',month:'short'}))}</span>` : ''}</button>
+      ${nextPlan ? '' : `<button class="mono tmbtn" onclick="openPlanSheet(null,'${p.id}')">Schedule</button>`}</div>` }).join('') || `<p class="emptyrow grey">Add people you’d like to meet: a partner in a team you’re curious about, a grad, a speaker. Jot down what to ask them.</p>`}`;
+};
+
+function openPlanSheet(id, pid){
+  const x = id ? D.plans.find(y => y.id === id) : null;
+  ui.psel = new Set(x ? x.people||[] : pid ? [pid] : []); ui.pq = ''; ui.kind = x ? x.kind : 'Coffee';
+  const def = new Date(now() + DAY); def.setHours(10,0,0,0);
+  sheet(`<form onsubmit="savePlan(event,${x?`'${x.id}'`:'null'})"><div class="title">${x?'Edit<br>plan':'Schedule'}</div>
+    <div class="fld"><span class="mono grey">What</span><div class="opts">${KINDS.map(k => `<button type="button" class="opt ${ui.kind===k?'on':''}" onclick="ui.kind='${k}';pickOne(this)">${k}</button>`).join('')}</div></div>
+    <div class="fld"><span class="mono grey">With</span><div class="picker" id="picker">${pickerHTML()}</div></div>
+    <div class="two"><label class="fld"><span class="mono grey">When</span><input type="datetime-local" name="t" value="${dtInput(x ? x.t : def.getTime())}" required></label>
+    <label class="fld"><span class="mono grey">Where</span><input name="place" value="${esc(x ? x.place||'' : '')}" placeholder="Cafe downstairs" autocomplete="off"></label></div>
+    <label class="fld"><span class="mono grey">Notes</span><textarea name="notes" rows="2" placeholder="Booked? Who reached out? Anything to bring?">${esc(x ? x.notes||'' : '')}</textarea></label>
+    <p class="intro grey" style="padding-top:12px">Talking points live on each person’s page and show up on this plan automatically.</p>
+    ${x?`<button type="button" class="link mono danger" style="margin:4px 20px 0" onclick="deletePlan('${x.id}')">Delete plan</button>`:''}
+    <div class="sheetbtns"><button type="button" onclick="closeSheet()">Cancel</button><button type="submit">Save →</button></div></form>`);
+}
+function savePlan(ev, id){
+  ev.preventDefault(); const f = new FormData(ev.target), v = f.get('t'); if(!v) return;
+  const [dp, tp] = v.split('T'), [y,m,d] = dp.split('-').map(Number), [hh,mm] = (tp||'09:00').split(':').map(Number);
+  let x = id ? D.plans.find(y => y.id === id) : null;
+  if(!x){ x = {id:uid(), done:false}; D.plans.push(x) }
+  Object.assign(x, {kind:ui.kind||'Coffee', people:[...ui.psel], t:new Date(y,m-1,d,hh,mm).getTime(), place:(f.get('place')||'').toString().trim(), notes:(f.get('notes')||'').toString().trim()}); touch(x);
+  closeSheet(); commit(); toast(id ? 'Plan saved' : 'Scheduled');
+}
+function deletePlan(id){ D.plans = D.plans.filter(x => x.id !== id); D.deleted[id] = now(); closeSheet(); commit(); toast('Plan deleted') }
+function logPlan(id){
+  const x = D.plans.find(y => y.id === id); ui.fromPlan = id;
+  const done = (x.people||[]).map(P).filter(Boolean).flatMap(p => (p.talk||[]).filter(t => t.done).map(t => t.text));
+  openEntrySheet(null, null, `${planTitle(x)}${x.place?` at ${x.place}`:''}. ${done.length ? 'Talked about: ' + done.join('; ').replace(/[.?!]$/,'') + '. ' : ''}`);
+  ui.psel = new Set(x.people||[]); refreshPicker(false);
+  const dEl = $('#sheet [name=d]'); if(dEl) dEl.value = dateInput(x.t);
+}
+function downloadICS(id){
+  const x = D.plans.find(y => y.id === id), ps = (x.people||[]).map(P).filter(Boolean);
+  const f = t => { const d = new Date(t); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}00` };
+  const ic = s => String(s||'').replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/[,;]/g, m => '\\'+m);
+  const pts = ps.flatMap(p => openTalk(p).map(t => `- ${t.text}`));
+  const desc = [x.notes, pts.length ? 'To talk about:\n' + pts.join('\n') : ''].filter(Boolean).join('\n\n');
+  const body = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Network//EN','BEGIN:VEVENT',`UID:${x.id}@network`,`DTSTAMP:${f(now())}`,`DTSTART:${f(x.t)}`,`DTEND:${f(x.t + ((x.kind==='Call')?30:60)*60e3)}`,
+    `SUMMARY:${ic(planTitle(x))}`, x.place ? `LOCATION:${ic(x.place)}` : '', desc ? `DESCRIPTION:${ic(desc)}` : '', 'END:VEVENT','END:VCALENDAR'].filter(Boolean).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], {type:'text/calendar'})); a.download = `${planTitle(x).replace(/[^\w ]+/g,'').slice(0,40)}.ics`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
 /* ---------- flashcards (simple flip-through, no scoring) ---------- */
 function startCards(deck){ ui.fc = null; ui.cardDeck = deck || 'all'; go('cards') }
 function buildDeck(deck){
-  let ps = deck === 'all' || !G(deck) ? [...D.people] : inG(deck);
+  let ps = (deck === 'all' || !G(deck) ? [...D.people] : inG(deck)).filter(p => !isProspect(p));
   ps = ps.map(p => [Math.random(), p.id]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
   ui.fc = {deck, queue:ps, i:0, flipped:false};
 }
@@ -580,6 +678,8 @@ function saveEntry(ev, id){
   let e = id ? D.log.find(x => x.id === id) : null;
   if(!e){ e = {id:uid()}; D.log.push(e) }
   Object.assign(e, {text, people:[...ui.psel], t: fromDateInput(f.get('d'), e.t || now())}); touch(e);
+  if(ui.fromPlan){ const x = D.plans.find(y => y.id === ui.fromPlan); if(x){ x.done = true; x.entry = e.id; touch(x) }
+    (e.people||[]).map(P).filter(p => p && isProspect(p)).forEach(p => { p.status = 'met'; touch(p) }); ui.fromPlan = null }
   closeSheet(); commit(); toast(id ? 'Entry saved' : 'Logged');
 }
 function deleteEntry(id){ D.log = D.log.filter(e => e.id !== id); D.deleted[id] = now(); closeSheet(); commit(); toast('Entry deleted') }
@@ -587,6 +687,8 @@ function openAdd(){
   sheet(`<div class="title">Add</div>
     <button class="set" style="width:100%" onclick="closeSheet();openPersonSheet()"><div><b>New person</b><small>Someone you’ve met: photo, role, team, where you met</small></div><span class="mono grey">→</span></button>
     <button class="set" style="width:100%" onclick="closeSheet();openEntrySheet(null, ui.view==='person'?ui.person:null)"><div><b>Log entry</b><small>A coffee, a meeting, an event, and who was there</small></div><span class="mono grey">→</span></button>
+    <button class="set" style="width:100%" onclick="closeSheet();openPlanSheet(null, ui.view==='person'?ui.person:null)"><div><b>Schedule a coffee</b><small>Coffee, lunch, a call, with talking points ready</small></div><span class="mono grey">→</span></button>
+    <button class="set" style="width:100%" onclick="closeSheet();openPersonSheet(null,null,'tomeet')"><div><b>Someone to meet</b><small>A person you’d like to get to know, and what to ask them</small></div><span class="mono grey">→</span></button>
     <button class="set" style="width:100%" onclick="closeSheet();openGroupSheet()"><div><b>New group</b><small>A cohort, a team, an event</small></div><span class="mono grey">→</span></button>
     <div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet()">Cancel</button></div>`);
 }
@@ -604,8 +706,8 @@ function newGroup(name, pc){
 }
 function pickOne(el){ el.parentNode.querySelectorAll('.opt').forEach(b => b.classList.remove('on')); el.classList.add('on') }
 
-function openPersonSheet(id, focus){
-  const p = id ? P(id) : null;
+function openPersonSheet(id, focus, status){
+  const p = id ? P(id) : null; ui.status = p ? (p.status||'met') : (status || 'met');
   ui.sel = new Set(p ? (p.groups||[]).filter(g=>G(g)) : (ui.filter!=='all' && G(ui.filter) ? [ui.filter] : []));
   ui.ring = p ? (p.ring||3) : 3; ui.photo = undefined;
   const v = k => esc(p ? p[k]||'' : '');
@@ -618,9 +720,10 @@ function openPersonSheet(id, focus){
     <label class="fld"><span class="mono grey">Last name</span><input name="last" value="${v('last')}" autocomplete="off" autocapitalize="words"></label></div>
     <div class="two"><label class="fld"><span class="mono grey">Role</span><input name="role" value="${v('role')}" placeholder="Associate" autocomplete="off"></label>
     <label class="fld"><span class="mono grey">Team</span><input name="team" value="${v('team')}" placeholder="Disputes" autocomplete="off"></label></div>
+    <div class="fld"><span class="mono grey">Status</span><div class="opts">${[['met','Met'],['tomeet','Want to meet']].map(([k,l]) => `<button type="button" class="opt ${ui.status===k?'on':''}" onclick="ui.status='${k}';pickOne(this)">${l}</button>`).join('')}</div></div>
     <div class="fld"><span class="mono grey">Groups</span><div class="opts" id="chips">${chipsHTML()}</div></div>
     <div class="fld"><span class="mono grey">Orbit · how well you know them</span><div class="opts">${RINGS.map((l,i)=>`<button type="button" class="opt ${ui.ring===i+1?'on':''}" onclick="ui.ring=${i+1};pickOne(this)">${l}</button>`).join('')}</div></div>
-    <label class="fld"><span class="mono grey">Where you met</span><input name="met" value="${v('met')}" placeholder="Clerkship welcome drinks" autocomplete="off"></label>
+    <label class="fld"><span class="mono grey">Where you met · or how you know of them</span><input name="met" value="${v('met')}" placeholder="Clerkship welcome drinks" autocomplete="off"></label>
     <label class="fld"><span class="mono grey">Memory hook</span><input name="hook" value="${v('hook')}" placeholder="One detail to remember them by" autocomplete="off"></label>
     <label class="fld"><span class="mono grey">Follow-up</span><input name="follow" value="${v('follow')}" placeholder="Optional, e.g. send thank-you note" autocomplete="off"></label>
     <details class="more" ${p&&(p.email||p.phone||p.linkedin)?'open':''}><summary class="mono grey">Contact details</summary>
@@ -642,7 +745,7 @@ function savePerson(e, id){
   let p = id ? P(id) : null;
   if(!p){ p = {id:uid(), n:Math.max(0,...D.people.map(x=>x.n||0))+1, created:now()}; D.people.push(p) }
   Object.assign(p, {first:val('first'), last:val('last'), role:val('role'), team:val('team'), met:val('met'), hook:val('hook'), follow:val('follow'),
-                    email:val('email'), phone:val('phone'), linkedin:val('linkedin'), groups:[...ui.sel], ring:ui.ring});
+                    email:val('email'), phone:val('phone'), linkedin:val('linkedin'), groups:[...ui.sel], ring:ui.ring, status:ui.status||'met'});
   delete p.sample; touch(p);
   if(ui.photo !== undefined) setPhoto(p.id, ui.photo);
   closeSheet(); ui.person = p.id; ui.view = 'person'; commit(); toast(id ? 'Saved' : `${p.first} added`);
@@ -655,6 +758,7 @@ function confirmDelete(id){
 function deletePerson(id){
   D.people = D.people.filter(p => p.id !== id); D.deleted[id] = now();
   D.log.forEach(e => { if((e.people||[]).includes(id)){ e.people = e.people.filter(x => x !== id); touch(e) } });
+  D.plans.forEach(x => { if((x.people||[]).includes(id)){ x.people = x.people.filter(y => y !== id); touch(x) } });
   if(PH[id]) setPhoto(id, null);
   closeSheet(); ui.view = 'people'; commit(); toast('Deleted');
 }
@@ -724,6 +828,13 @@ function loadSamples(){
    [12,'Sophie,Grace','Women in Law breakfast. Sophie did an LLM in Paris and is happy to chat about competition law.'],
    [20,'Liam','Practice talk on class actions. Ask about the London secondment.']]
    .forEach(([d,names,text]) => D.log.push(touch({id:uid(), t:now()-d*DAY, people:names.split(',').map(by).filter(Boolean), text, sample:true})));
+  const z = touch({id:uid(), n:++n, first:'Zara', last:'Ahmed', role:'Partner', team:'Energy & Infrastructure', groups:[gP.id], ring:3, met:'Spoke at the grad careers night', hook:'', follow:'', status:'tomeet', sample:true, created:now(),
+    talk:[{id:uid(), text:'How she moved from in-house back to private practice', done:false},{id:uid(), text:'Is the renewables team taking seasonal clerks?', done:false}]});
+  D.people.push(z);
+  const pr = D.people.find(p => p.sample && p.first === 'Priya'); if(pr){ pr.talk = [{id:uid(), text:'Ask how the marathon training is going', done:false},{id:uid(), text:'Follow up on the research memo', done:false}]; touch(pr) }
+  const at = (d,h) => { const x = new Date(now()+d*DAY); x.setHours(h,0,0,0); return x.getTime() };
+  D.plans.push(touch({id:uid(), kind:'Coffee', people:[pr.id], t:at(2,9), place:'Cafe downstairs', notes:'She suggested it after the team lunch', done:false, sample:true}));
+  D.plans.push(touch({id:uid(), kind:'Coffee', people:[z.id], t:at(8,15), place:'', notes:'Emailed her assistant to book', done:false, sample:true}));
   [gC,gP,gD,gM].forEach(g => g.sample = true);
   commit(); toast('Sample people added');
 }
@@ -731,7 +842,7 @@ function removeSamples(){
   const t = now();
   D.people.filter(p => p.sample).forEach(p => D.deleted[p.id] = t);
   D.groups.filter(g => g.sample && !D.people.some(p => !p.sample && (p.groups||[]).includes(g.id))).forEach(g => D.deleted[g.id] = t);
-  D.log.filter(e => e.sample).forEach(e => D.deleted[e.id] = t);
+  D.log.filter(e => e.sample).forEach(e => D.deleted[e.id] = t); D.plans.filter(x => x.sample).forEach(x => D.deleted[x.id] = t); D.plans = D.plans.filter(x => !x.sample);
   D.people = D.people.filter(p => !p.sample); D.groups = D.groups.filter(g => !D.deleted[g.id]); D.log = D.log.filter(e => !e.sample);
   if(ui.filter !== 'all' && !G(ui.filter)) ui.filter = 'all';
   commit(); toast('Sample people removed');
@@ -739,7 +850,7 @@ function removeSamples(){
 
 /* ---------- sheet + toast ---------- */
 function sheet(h){ $('#sheet').innerHTML = h; $('#scrim').classList.add('on'); document.body.style.overflow = 'hidden' }
-function closeSheet(){ $('#scrim').classList.remove('on'); document.body.style.overflow = '' }
+function closeSheet(){ ui.fromPlan = null; $('#scrim').classList.remove('on'); document.body.style.overflow = '' }
 let toastT;
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200) }
 
