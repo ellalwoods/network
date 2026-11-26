@@ -588,7 +588,6 @@ views.settings = () => {
     : `<button class="set" style="width:100%" onclick="startLogin('signin')"><div><b>Sign in to sync</b><small>Name + planet + constellation</small></div><span class="mono grey">→</span></button>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
   <button class="set" style="width:100%" onclick="exportData()"><div><b>Export backup</b><small>Download everyone, notes and photos as a file</small></div><span class="mono grey">↓</span></button>
-  ${PACKS.map(k => `<button class="set" style="width:100%" onclick="openPackSheet('${k.file}')"><div><b>Add ${esc(k.label)}</b><small>${k.count} people · needs the passcode</small></div><span class="mono grey">+</span></button>`).join('')}
   <label class="set" style="cursor:pointer"><div><b>Import backup</b><small>Merge a Network backup file into this orbit</small></div><span class="mono grey">↑</span><input type="file" accept="application/json,.json" hidden onchange="importData(this)"></label>
   ${samples ? `<button class="set" style="width:100%" onclick="removeSamples()"><div><b>Remove sample people</b><small>${samples} sample ${samples===1?'person':'people'}</small></div><span class="mono grey">×</span></button>` : ''}
   <p class="intro grey" style="padding-top:20px;padding-bottom:40px">To install: on iPhone, tap Share → Add to Home Screen. On a laptop, use the install icon in the address bar.</p>`;
@@ -835,8 +834,22 @@ async function importData(input){
   }catch(e){ toast('That isn’t a Network backup file') }
 }
 // Encrypted starter packs (kept encrypted because this repo and site are public)
-const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', label:'Allens summer clerks 2026', count:33}];
-const pendingPack = () => PACKS.find(k => !G(k.group) && !localStorage.getItem('pack-hide-'+k.group));
+const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', label:'Allens summer clerks 2026', count:33, code:'clerks-4322'}];
+const pendingPack = () => null;
+// Add starter packs automatically, once per device (never re-adds a group you've deleted)
+async function autoPacks(){
+  for(const k of PACKS){
+    if(G(k.group) || D.deleted[k.group] || localStorage.getItem('pack-done-'+k.group)) continue;
+    try{ const pack = await decryptPack(k.file, k.code); D = merge(D, pack.data); localStorage.setItem('pack-done-'+k.group,'1'); commit(); toast(`${k.count} people added`) }
+    catch(e){ console.warn('pack', e) }
+  }
+}
+async function decryptPack(file, code){
+  const j = await (await fetch(file, {cache:'no-store'})).json(), b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), 'PBKDF2', false, ['deriveKey']);
+  const key = await crypto.subtle.deriveKey({name:'PBKDF2', salt:b(j.salt), iterations:200000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM', iv:b(j.iv)}, key, b(j.ct))));
+}
 function openPackSheet(file){
   const k = PACKS.find(x => x.file === file);
   sheet(`<form onsubmit="importPack(event,'${file}')"><div class="title">Add<br>${k.count} people</div>
@@ -936,7 +949,8 @@ async function boot(){
   }catch(e){ console.warn('storage', e); toast('This browser is blocking storage, so changes won’t be saved.') }
   if(!acct && !localStorage.getItem('rolo-skip-login') && SYNC_ON) ui.view = 'login';
   render();
-  if(acct) syncNow();
+  if(acct) await syncNow();
+  autoPacks();
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') syncNow() });
   window.addEventListener('online', () => syncNow());
   if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
