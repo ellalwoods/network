@@ -637,7 +637,7 @@ async function submitLogin(){
     } else {
       const remote = await rpc('rolo_load',{p_key:key});
       if(remote){ acct = {label,key}; await idb.set('acct',acct); D = merge(D, remote); await idb.set('data',D);
-        L.busy = false; toast('Welcome back'); go('people'); syncNow(); return }
+        L.busy = false; toast('Welcome back'); go('people'); await syncNow(); autoPacks(); return }
       L.pending = {label, key}; L.busy = false; render();
       return sheet(`<div class="title">New<br>orbit?</div>
         <p class="intro" style="padding-top:0">There’s no orbit for <b>${esc(label)}</b> yet.${D.people.length?` The ${D.people.length} ${D.people.length===1?'person':'people'} on this device will come with you.`:''}</p>
@@ -653,7 +653,7 @@ async function submitLogin(){
 }
 async function confirmNewOrbit(){
   closeSheet(); acct = ui.login.pending; ui.login.pending = null;
-  await idb.set('acct', acct); toast('New orbit created'); go('people'); syncNow();
+  await idb.set('acct', acct); toast('New orbit created'); go('people'); await syncNow(); autoPacks();
 }
 function confirmSwitch(){
   sheet(`<div class="title">Switch<br>account?</div>
@@ -834,11 +834,20 @@ async function importData(input){
   }catch(e){ toast('That isn’t a Network backup file') }
 }
 // Encrypted starter packs (kept encrypted because this repo and site are public)
-const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', label:'Allens summer clerks 2026', count:33, code:'clerks-4322'}];
+const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', prefix:'slc26-', owner:'ella', label:'Allens summer clerks 2026', count:33, code:'clerks-4322'}];
 const pendingPack = () => null;
 // Add starter packs automatically, once per device (never re-adds a group you've deleted)
+const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : '';
 async function autoPacks(){
   for(const k of PACKS){
+    // packs belong to one person's account only
+    if(acctName() !== k.owner){
+      if(localStorage.getItem('pack-done-'+k.group)){   // auto-added here earlier: take it back out (locally only, no sync tombstones)
+        D.people = D.people.filter(p => !p.id.startsWith(k.prefix)); D.groups = D.groups.filter(g => g.id !== k.group);
+        localStorage.removeItem('pack-done-'+k.group); if(ui.filter === k.group) ui.filter = 'all'; idb.set('data', D); render(); schedulePush();
+      }
+      continue;
+    }
     if(G(k.group) || D.deleted[k.group] || localStorage.getItem('pack-done-'+k.group)) continue;
     try{ const pack = await decryptPack(k.file, k.code); D = merge(D, pack.data); localStorage.setItem('pack-done-'+k.group,'1'); commit(); toast(`${k.count} people added`) }
     catch(e){ console.warn('pack', e) }
