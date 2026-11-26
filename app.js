@@ -161,7 +161,7 @@ function openOrbitGroups(){
 }
 
 function renderNav(){
-  const v = ui.view === 'person' || ui.view === 'cards' ? 'people' : ui.view;
+  const v = ['person','cards','photos'].includes(ui.view) ? 'people' : ui.view;
   const sw = g => colourOn() ? `<i class="sw" style="background:${gHex(g)}"></i>` : '';
   $('#side').innerHTML =
     `<div class="brand">Network<span id="syncdot" data-s="${sync.state}" title="Sync status"></span></div>` +
@@ -335,7 +335,7 @@ views.people = () => {
       <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
       <button class="link mono" onclick="loadSamples()">Or explore with sample people →</button></div>`;
   return `
-  <div class="bar mono"><span>${today()}</span><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
+  <div class="bar mono"><span>${today()}</span><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}${D.people.some(p=>!photoOf(p))?`<button class="grey" onclick="go('photos')">Photos</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
   <div class="title">People</div>
   ${packBar}
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
@@ -398,7 +398,7 @@ views.person = () => {
         ${isProspect(p) ? `<div><span>Status</span><span><span class="tagline">Want to meet</span> <button class="glink" style="margin-left:8px" onclick="markMet('${p.id}')">Mark as met</button></span></div>` : ''}
         ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact(isProspect(p)?'Via':'Met',esc(p.met))}
         ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('people')">${esc(g.name)}</button>`).join(', '))}
-        ${fact('Email',p.email?link('mailto:'+p.email,p.email):'')}${fact('Phone',p.phone?link('tel:'+p.phone,p.phone):'')}${fact('LinkedIn',li?link(li,'Profile ↗'):'')}
+        ${fact('Email',p.email?link('mailto:'+p.email,p.email):'')}${fact('Phone',p.phone?link('tel:'+p.phone,p.phone):'')}${fact('LinkedIn',li?link(li,'Profile ↗'):link(liSearch(p),'Search LinkedIn ↗'))}
         ${isProspect(p) ? '' : inOrbit(p) ? `<div><span>Orbit</span><span><span class="rings">${RINGS.map((l,k)=>`<button class="${(p.ring||3)===k+1?'on':''}" onclick="setRing('${p.id}',${k+1})">${l}</button>`).join('')}</span><button class="glink grey" style="margin-top:8px;display:block;font-size:13px" onclick="setOrbit('${p.id}',false)">Remove from orbit</button></span></div>`
           : `<div><span>Orbit</span><span><button class="btn small ghost" onclick="setOrbit('${p.id}',true)">+ Add to orbit</button></span></div>`}
         ${fact('Added', p.created ? esc(dayLabel(p.created)) : '')}
@@ -421,6 +421,27 @@ views.person = () => {
     </div>
   </div>`;
 };
+
+/* ---------- photos to add (quick queue) ---------- */
+const liSearch = p => 'https://www.linkedin.com/search/results/people/?keywords=' + encodeURIComponent([fullName(p), (p.met||'').includes('Allens') ? 'Allens' : (p.team||'')].filter(Boolean).join(' '));
+views.photos = () => {
+  const list = D.people.filter(p => !photoOf(p)).sort((a,b) => fullName(a).localeCompare(fullName(b)));
+  return `<div class="bar mono"><button onclick="go('people')">← People</button><span class="grey">${pad(list.length)} without a photo</span></div>
+  <div class="title">Photos<br>to add</div>
+  <p class="intro grey">Tap <b>LinkedIn</b> to find them, then save or copy their photo. Tap <b>+ Photo</b> to pick it from your camera roll (or paste it on a laptop: Ctrl+V right after tapping).</p>
+  <div style="border-top:1px solid var(--ink)">${list.map(p => `<div class="tmrow"><button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ')||'—')}</small></div></button>
+    <a class="mono tmbtn" style="display:grid;place-items:center" href="${liSearch(p)}" target="_blank" rel="noopener">LinkedIn ↗</a>
+    <label class="mono tmbtn" style="display:grid;place-items:center;cursor:pointer" onclick="ui.photoFor='${p.id}'">+ Photo<input type="file" accept="image/*" hidden onchange="quickPhoto(this,'${p.id}')"></label></div>`).join('') || '<p class="emptyrow grey">Everyone has a photo.</p>'}</div>`;
+};
+async function quickPhoto(input, pid){
+  const f = input.files && input.files[0]; if(!f) return;
+  try{ setPhoto(pid, await compress(f)); touch(P(pid)); commit(); toast(`Photo added for ${P(pid).first}`) } catch(e){ toast(e.message) }
+}
+document.addEventListener('paste', async e => {
+  if(ui.view !== 'photos' || !ui.photoFor || !P(ui.photoFor)) return;
+  const item = [...(e.clipboardData?.items||[])].find(i => i.type.startsWith('image/')); if(!item) return;
+  e.preventDefault(); setPhoto(ui.photoFor, await compress(item.getAsFile())); touch(P(ui.photoFor)); commit(); toast(`Photo added for ${P(ui.photoFor).first}`);
+});
 
 /* ---------- groups ---------- */
 views.groups = () => `
