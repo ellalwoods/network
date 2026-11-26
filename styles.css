@@ -332,3 +332,9 @@ input,button,textarea{-webkit-tap-highlight-color:transparent}
 @media (min-width:900px){.tmbtn{padding:0 32px}}
 .tmbtn:hover{background:var(--ink);color:var(--white)}
 .fld input[type=datetime-local]{font-family:var(--mono);font-size:15px}
+
+/* round photos everywhere small (matches the orbit); the profile portrait stays rectangular */
+.ph{aspect-ratio:1;border-radius:50%}
+.pc-face{border-radius:50%;width:78%;margin:0 auto 10px}
+.pcard{align-items:center;text-align:center}
+.photo img{border-radius:50%}

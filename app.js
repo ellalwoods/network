@@ -22,6 +22,7 @@ const PLANETS = [['Mercury',3],['Venus',5],['Earth',5.5],['Mars',4],['Jupiter',1
 const CONS = ['Crux','Orion','Lyra','Cygnus','Carina','Centaurus','Scorpius','Pegasus'];
 const CON_PTS = [[[17,3],[17,22],[9,11],[25,11],[21,18]],[[9,4],[25,5],[14,13],[17,13],[20,13],[10,22],[24,21]],[[17,4],[13,12],[21,12],[12,21],[22,21]],[[17,3],[17,23],[7,9],[27,9],[17,13]],[[5,18],[12,14],[19,15],[26,8],[29,20]],[[6,6],[12,12],[18,10],[24,16],[28,22],[16,21]],[[6,5],[11,9],[15,14],[19,19],[24,21],[29,17]],[[8,6],[26,6],[8,20],[26,20],[3,12]]];
 const RINGS = ['Inner','Middle','Outer'];
+const FIRMS = ['Allens','Ashurst Perkins Coie','Clayton Utz','Herbert Smith Freehills Kramer','King & Wood Mallesons','MinterEllison'];
 const DAY = 864e5;
 const NOGROUP = '#B5B3AC';
 
@@ -182,7 +183,7 @@ function faceBox(p, cls, extraStyle=''){
   const style = colourOn() ? `background:${t.soft};color:${t.deep};` : '';
   return `<div class="${cls}" style="${style}${extraStyle}">${d ? `<img src="${d}" alt="">` : esc(ini(p))}</div>`;
 }
-const row = (p, n, right='') => `<button class="ent" onclick="openPerson('${p.id}')"><span class="n">${pad(n)}</span>${faceBox(p,'ph')}<div style="min-width:0"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' / ') || '—')}</small></div>${right}</button>`;
+const row = (p, n, right='') => `<button class="ent" onclick="openPerson('${p.id}')"><span class="n">${pad(n)}</span>${faceBox(p,'ph')}<div style="min-width:0"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' / ') || '—')}</small></div>${right}</button>`;
 const groupFilters = (cur, fn, extra='') => `<div class="filters"><button class="${cur==='all'?'on':''}" onclick="${fn}('all')">All</button>${D.groups.map(g => `<button class="${cur===g.id?'on':''}" onclick="${fn}('${g.id}')">${colourOn()?`<i class="sw" style="background:${gHex(g)}"></i>`:''}${esc(g.short||g.name)}</button>`).join('')}${extra}</div>`;
 const today = () => new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
 
@@ -288,12 +289,12 @@ views.orbit = () => {
 const tagStyle = p => colourOn() ? `style="background:${tones(pHex(p)).wash};border-color:${tones(pHex(p)).deep};color:${tones(pHex(p)).deep}"` : '';
 
 /* ---------- people (the notebook) ---------- */
-const SORTS = [['az','A–Z'],['recent','Recent'],['team','Team'],['group','Group']];
+const SORTS = [['az','A–Z'],['recent','Recent'],['firm','Firm'],['team','Team'],['group','Group']];
 function setSort(s){ ui.sort = s; localStorage.setItem('rolo-sort', s); render() }
 function setLayout(l){ ui.layout = l; localStorage.setItem('rolo-layout', l); render() }
 function filteredPeople(){
   const q = norm(ui.q), m = lastEntryMap();
-  const text = p => norm([p.first,p.last,p.team,p.role,p.hook,p.met,p.follow,p.email,...(p.talk||[]).map(t=>t.text),...entriesFor(p.id).map(e=>e.text),...(p.groups||[]).map(id=>G(id)?.name)].join(' '));
+  const text = p => norm([p.first,p.last,p.team,p.firm,p.role,p.hook,p.met,p.follow,p.email,...(p.talk||[]).map(t=>t.text),...entriesFor(p.id).map(e=>e.text),...(p.groups||[]).map(id=>G(id)?.name)].join(' '));
   const list = D.people.filter(p => (ui.filter==='all' || (p.groups||[]).includes(ui.filter)) && (!q || text(p).includes(q)));
   return ui.sort === 'recent' ? list.sort((a,b) => lastAct(b,m) - lastAct(a,m)) : list.sort((a,b) => fullName(a).localeCompare(fullName(b)));
 }
@@ -301,18 +302,19 @@ function sections(list){
   const m = lastEntryMap(), out = new Map(), add = (k,p) => { if(!out.has(k)) out.set(k,[]); out.get(k).push(p) };
   if(ui.sort === 'az') list.forEach(p => add(((p.first||p.last||'#')[0]||'#').toUpperCase().replace(/[^A-Z]/,'#'), p));
   else if(ui.sort === 'recent') list.forEach(p => { const d = (startOfDay(now()) - startOfDay(lastAct(p,m)))/DAY; add(d < 7 ? 'This week' : d < 31 ? 'This month' : d < 365 ? 'This year' : 'Earlier', p) });
+  else if(ui.sort === 'firm'){ list.forEach(p => add(p.firm || 'No firm', p)); return new Map([...out].sort((a,b) => a[0]==='No firm' ? 1 : b[0]==='No firm' ? -1 : a[0].localeCompare(b[0]))) }
   else if(ui.sort === 'team'){ list.forEach(p => add(p.team || 'No team', p)); return new Map([...out].sort((a,b) => a[0]==='No team' ? 1 : b[0]==='No team' ? -1 : a[0].localeCompare(b[0]))) }
   else { D.groups.forEach(g => list.filter(p => (p.groups||[]).includes(g.id)).forEach(p => add(g.name, p))); list.filter(p => !(p.groups||[]).some(id => G(id))).forEach(p => add('No group', p)) }
   return out;
 }
 function personRow(p, m){
   const e = m[p.id];
-  return `<button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small>
+  return `<button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small>
     ${e ? `<span class="snip"><span class="mono grey">${esc(rel(e.t))}</span> ${esc(e.text.slice(0,90))}</span>` : p.met ? `<span class="snip"><span class="mono grey">Met</span> ${esc(p.met)}</span>` : ''}</div>
     ${isProspect(p) ? `<span class="tagline">To meet</span>` : p.follow ? `<span class="tagline" ${tagStyle(p)}>Follow up</span>` : ''}</button>`;
 }
 function personCard(p){
-  return `<button class="pcard" onclick="openPerson('${p.id}')">${faceBox(p,'pc-face')}<b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small></button>`;
+  return `<button class="pcard" onclick="openPerson('${p.id}')">${faceBox(p,'pc-face')}<b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small></button>`;
 }
 function listHTML(){
   const list = filteredPeople(), m = lastEntryMap();
@@ -396,7 +398,7 @@ views.person = () => {
       <div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
       <div class="facts">
         ${isProspect(p) ? `<div><span>Status</span><span><span class="tagline">Want to meet</span> <button class="glink" style="margin-left:8px" onclick="markMet('${p.id}')">Mark as met</button></span></div>` : ''}
-        ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact(isProspect(p)?'Via':'Met',esc(p.met))}
+        ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact('Firm',esc(p.firm))}${fact(isProspect(p)?'Via':'Met',esc(p.met))}
         ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('people')">${esc(g.name)}</button>`).join(', '))}
         ${fact('Email',p.email?link('mailto:'+p.email,p.email):'')}${fact('Phone',p.phone?link('tel:'+p.phone,p.phone):'')}${fact('LinkedIn',li?link(li,'Profile ↗'):'')}
         ${isProspect(p) ? '' : inOrbit(p) ? `<div><span>Orbit</span><span><span class="rings">${RINGS.map((l,k)=>`<button class="${(p.ring||3)===k+1?'on':''}" onclick="setRing('${p.id}',${k+1})">${l}</button>`).join('')}</span><button class="glink grey" style="margin-top:8px;display:block;font-size:13px" onclick="setOrbit('${p.id}',false)">Remove from orbit</button></span></div>`
@@ -478,7 +480,7 @@ views.plans = () => {
   ${future.map(planCard).join('') || `<p class="emptyrow grey">Nothing scheduled. Plan a coffee with someone you want to get to know.</p>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Want to meet</span><span class="grey">${pad(tm.length)}</span></div>
   ${tm.map(p => { const pts = openTalk(p), nextPlan = plansFor(p.id)[0]; return `<div class="tmrow">
-      <button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team].filter(Boolean).join(' · ') || '—')}</small>
+      <button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small>
         ${pts.length ? `<span class="snip"><span class="mono grey">${pts.length} to talk about</span> ${esc(pts[0].text)}${pts.length>1?'…':''}</span>` : p.met ? `<span class="snip"><span class="mono grey">Via</span> ${esc(p.met)}</span>` : ''}</div>
         ${nextPlan ? `<span class="tagline">${esc(new Date(nextPlan.t).toLocaleDateString('en-AU',{day:'numeric',month:'short'}))}</span>` : ''}</button>
       ${nextPlan ? '' : `<button class="mono tmbtn" onclick="openPlanSheet(null,'${p.id}')">Schedule</button>`}</div>` }).join('') || `<p class="emptyrow grey">Add people you’d like to meet: a partner in a team you’re curious about, a grad, a speaker. Jot down what to ask them.</p>`}`;
@@ -546,7 +548,7 @@ views.cards = () => {
   const t = tones(pHex(p)), col = colourOn(), d = photoOf(p);
   const g = G((p.groups||[]).find(id=>G(id)));
   const front = d ? `<div class="big photo-big"><img src="${d}" alt=""></div>` :
-    `<div class="big clue"><span class="mono" style="opacity:.7">No photo · clues</span><p>${esc([p.role,p.team].filter(Boolean).join(', ')||'—')}</p>${p.met?`<p class="sm">Met: ${esc(p.met)}</p>`:''}${p.hook?`<p class="sm">“${esc(p.hook)}”</p>`:''}</div>`;
+    `<div class="big clue"><span class="mono" style="opacity:.7">No photo · clues</span><p>${esc([p.role,p.team,p.firm].filter(Boolean).join(', ')||'—')}</p>${p.met?`<p class="sm">Met: ${esc(p.met)}</p>`:''}${p.hook?`<p class="sm">“${esc(p.hook)}”</p>`:''}</div>`;
   return head + `<div class="drill">
     <div class="prog">${q.map((_,k)=>`<i class="${k<f.i?'done':''}"></i>`).join('')}</div>
     <div class="flip ${f.flipped?'on':''}" onclick="ui.fc.flipped=!ui.fc.flipped;this.classList.toggle('on')">
@@ -741,6 +743,7 @@ function openPersonSheet(id, focus, status){
     <label class="fld"><span class="mono grey">Last name</span><input name="last" value="${v('last')}" autocomplete="off" autocapitalize="words"></label></div>
     <div class="two"><label class="fld"><span class="mono grey">Role</span><input name="role" value="${v('role')}" placeholder="Associate" autocomplete="off"></label>
     <label class="fld"><span class="mono grey">Team</span><input name="team" value="${v('team')}" placeholder="Disputes" autocomplete="off"></label></div>
+    <label class="fld"><span class="mono grey">Firm</span><input name="firm" value="${v('firm')}" placeholder="Allens" list="firms" autocomplete="off"><datalist id="firms">${[...new Set([...D.people.map(x=>x.firm).filter(Boolean), ...FIRMS])].map(f=>`<option value="${esc(f)}">`).join('')}</datalist></label>
     <div class="fld"><span class="mono grey">Status</span><div class="opts">${[['met','Met'],['tomeet','Want to meet']].map(([k,l]) => `<button type="button" class="opt ${ui.status===k?'on':''}" onclick="ui.status='${k}';pickOne(this)">${l}</button>`).join('')}</div></div>
     <div class="fld"><span class="mono grey">Groups</span><div class="opts" id="chips">${chipsHTML()}</div></div>
     <div class="fld"><span class="mono grey">Orbit · how close you are</span><div class="opts">${['Not in orbit',...RINGS].map((l,i)=>`<button type="button" class="opt ${ui.ring===i?'on':''}" onclick="ui.ring=${i};pickOne(this)">${l}</button>`).join('')}</div></div>
@@ -773,7 +776,7 @@ function savePerson(e, id){
   e.preventDefault(); const f = new FormData(e.target), val = k => (f.get(k)||'').toString().trim();
   let p = id ? P(id) : null;
   if(!p){ p = {id:uid(), n:Math.max(0,...D.people.map(x=>x.n||0))+1, created:now()}; D.people.push(p) }
-  Object.assign(p, {first:val('first'), last:val('last'), role:val('role'), team:val('team'), met:val('met'), hook:val('hook'), follow:val('follow'),
+  Object.assign(p, {first:val('first'), last:val('last'), role:val('role'), team:val('team'), firm:val('firm'), met:val('met'), hook:val('hook'), follow:val('follow'),
                     email:val('email'), phone:val('phone'), linkedin:val('linkedin'), groups:[...ui.sel], status:ui.status||'met'});
   if(ui.ring){ p.ring = ui.ring; p.orbit = true } else if(p.orbit === true || viaGroup(p)) p.orbit = false;
   delete p.sample; touch(p);
@@ -952,6 +955,7 @@ async function boot(){
     if(data) D = {...blank(), ...data};
     let moved = false;   // older versions kept notes on each person: move them into the log
     for(const p of D.people){ for(const n of p.notes||[]) { D.log.push(touch({id:n.id, t:n.t, people:[p.id], text:n.text})); moved = true } if(p.notes){ delete p.notes; touch(p) } delete p.srs }
+    for(const p of D.people) if(p.id.startsWith('slc26-') && p.team === 'Allens Sydney' && !p.firm){ p.firm = 'Allens'; p.team = ''; touch(p); moved = true }
     if(moved) idb.set('data', D);
     if(a) acct = a;
     for(const k of keys) if(String(k).startsWith('ph:')) PH[k.slice(3)] = await idb.get(k);
