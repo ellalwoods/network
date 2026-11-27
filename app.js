@@ -213,6 +213,7 @@ function renderNav(){
     `<div class="mono grey" style="padding:22px 20px 8px">Groups</div>` +
     D.groups.map(g => `<button class="grp" onclick="ui.filter='${g.id}';go('people')"><span>${sw(g)}${esc(g.name)}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
     `<button class="grp grey" onclick="openGroupSheet()"><span>+ New group</span><span></span></button>` +
+    ((D.sets||[]).length ? `<div class="mono grey" style="padding:22px 20px 8px">Flashcard folders</div>` + D.sets.map(x => `<button class="grp" onclick="startCards('set:${x.id}')"><span>▣ ${esc(x.name)}</span><span>${pad(x.cards.length)}</span></button>`).join('') : '') +
     `<button class="navbtn ${v==='settings'?'on':''}" style="margin-top:auto;border-top:1px solid var(--soft)" onclick="go('settings')"><span>Settings</span><span>06</span></button>` +
     `<button class="newbtn" onclick="openAdd()">+ Add</button>`;
   $('#tabbar').innerHTML = NAV.slice(0,4).map(([k,l]) => `<button class="${v===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('') +
@@ -383,6 +384,7 @@ views.people = () => {
   <div class="bar mono"><button onclick="go('settings')">⚙ Settings</button><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
   <div class="title">People</div>
   ${packBar}
+  ${(D.sets||[]).map(x => `<button class="composer" onclick="startCards('set:${x.id}')"><span><b>▣ ${esc(x.name)}</b> <span class="grey">· flashcard folder · ${x.cards.filter(c=>c.known).length}/${x.cards.length} known</span></span><span class="mono">Practise →</span></button>`).join('')}
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
   <div class="search"><span class="mono grey">Search</span><input id="q" value="${esc(ui.q)}" placeholder="Name, team, or anything you wrote" oninput="ui.q=this.value;document.getElementById('list').innerHTML=listHTML()" autocomplete="off"></div>
   <div class="toolbar"><div class="seg">${SORTS.map(([k,l]) => `<button class="${ui.sort===k?'on':''}" onclick="setSort('${k}')">${l}</button>`).join('')}</div>
@@ -664,8 +666,28 @@ views.set = () => {
   ${cards.map(c => { const d = PH[c.id] && PH[c.id].d; return `<div class="tmrow ${c.known?'known':''}"><div class="prow" style="cursor:default"><div class="ph">${d?`<img src="${d}" alt="">`:esc(((c.first||'')[0]||'')+((c.last||'')[0]||''))}</div><div class="pr-main"><b>${esc(c.first+' '+c.last)}</b><small>${esc([c.role,c.firm].filter(Boolean).join(' · '))}</small></div></div>
     <label class="mono tmbtn" style="display:grid;place-items:center;cursor:pointer">${d?'Photo ✓':'+ Photo'}<input type="file" accept="image/*" hidden onchange="setCardPhoto(this,'${s.id}','${c.id}')"></label>
     <button class="mono tmbtn" onclick="toggleKnown('${s.id}','${c.id}')">${c.known?'✓ Known':'Mark known'}</button></div>` }).join('')}
-  <div class="btnrow pad" style="margin-top:22px"><button class="btn ghost" onclick="resetKnown('${s.id}')">Reset known</button><button class="btn ghost danger" style="border-color:#9A2B2B" onclick="confirmDeleteSet('${s.id}')">Delete this folder</button></div>`;
+  <div class="btnrow pad" style="margin-top:22px"><button class="btn" onclick="openAddCard('${s.id}')">+ Add someone</button><button class="btn ghost" onclick="resetKnown('${s.id}')">Reset known</button><button class="btn ghost danger" style="border-color:#9A2B2B" onclick="confirmDeleteSet('${s.id}')">Delete this folder</button></div>`;
 };
+function openAddCard(sid){
+  ui.cq = '';
+  sheet(`<div class="title">Add to<br>folder</div>
+    <div class="sect mono" style="border-top:1px solid var(--ink)"><span>From your People</span></div>
+    <div class="search"><span class="mono grey">Search</span><input id="cq" placeholder="Name, team or firm" autocomplete="off" oninput="ui.cq=this.value;document.getElementById('aclist').innerHTML=addCardList('${sid}')"></div>
+    <div id="aclist">${addCardList(sid)}</div>
+    <form onsubmit="newCard(event,'${sid}')"><div class="sect mono" style="border-top:1px solid var(--ink)"><span>Or someone new</span></div>
+      <div class="two"><label class="fld"><span class="mono grey">First name</span><input name="first" required autocomplete="off" autocapitalize="words"></label><label class="fld"><span class="mono grey">Last name</span><input name="last" autocomplete="off" autocapitalize="words"></label></div>
+      <div class="two"><label class="fld"><span class="mono grey">Role</span><input name="role" autocomplete="off"></label><label class="fld"><span class="mono grey">Firm</span><input name="firm" autocomplete="off"></label></div>
+      <div class="sheetbtns"><button type="button" onclick="closeSheet();render()">Done</button><button type="submit">Add card →</button></div></form>`);
+}
+function addCardList(sid){
+  const s = SET(sid), q = norm(ui.cq||''), have = new Set(s.cards.map(c => c.id));
+  const list = q ? D.people.filter(p => norm([fullName(p),p.team,p.firm].join(' ')).includes(q)).slice(0,8) : [];
+  return list.map(p => `<div class="tmrow"><div class="prow" style="cursor:default">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.firm].filter(Boolean).join(' · '))}</small></div></div>
+    <button class="mono tmbtn" ${have.has(p.id)?'disabled':''} onclick="cardFromPerson('${sid}','${p.id}')">${have.has(p.id)?'✓ Added':'+ Add'}</button></div>`).join('') || `<p class="emptyrow grey">${q ? 'No one matches.' : 'Type a name to find someone you’ve already added.'}</p>`;
+}
+function cardFromPerson(sid, pid){ const s = SET(sid), p = P(pid); s.cards.push({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false, linked:true}); touch(s); idb.set('data',D); schedulePush(); $('#aclist').innerHTML = addCardList(sid); toast(`${p.first} added to the folder`) }
+function newCard(e, sid){ e.preventDefault(); const f = new FormData(e.target), v = k => (f.get(k)||'').toString().trim(); const s = SET(sid);
+  s.cards.push({id:'c-'+uid(), first:v('first'), last:v('last'), role:v('role'), firm:v('firm'), known:false}); touch(s); idb.set('data',D); schedulePush(); e.target.reset(); toast('Card added') }
 function toggleKnown(sid, cid){ const s = SET(sid), c = s.cards.find(x => x.id === cid); c.known = !c.known; touch(s); commit() }
 function resetKnown(sid){ const s = SET(sid); s.cards.forEach(c => c.known = false); touch(s); commit(); toast('Everyone’s back in the deck') }
 async function setCardPhoto(input, sid, cid){ const f = input.files && input.files[0]; if(!f) return; try{ setPhoto(cid, await compress(f)); touch(SET(sid)); commit(); toast('Photo added') }catch(e){ toast(e.message) } }
@@ -675,7 +697,7 @@ function confirmDeleteSet(sid){
     <div class="sheetbtns"><button onclick="closeSheet()">Cancel</button><button onclick="deleteSet('${sid}')">Delete</button></div>`);
 }
 function deleteSet(sid){
-  const s = SET(sid); s.cards.forEach(c => { if(PH[c.id]) setPhoto(c.id, null) });
+  const s = SET(sid); s.cards.forEach(c => { if(PH[c.id] && !P(c.id)) setPhoto(c.id, null) });
   D.sets = D.sets.filter(x => x.id !== sid); D.deleted[sid] = now(); ui.fc = null; ui.cardDeck = 'all';
   closeSheet(); ui.view = 'people'; commit(); toast('Folder deleted');
 }
