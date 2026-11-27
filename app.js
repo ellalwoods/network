@@ -62,7 +62,7 @@ const idb = (() => {
 })();
 
 /* ---------- state ---------- */
-const blank = () => ({v:1, people:[], groups:[], log:[], plans:[], deleted:{}, settings:{colour:false,u:0}});
+const blank = () => ({v:1, people:[], groups:[], log:[], plans:[], sets:[], deleted:{}, settings:{colour:false,u:0}});
 let D = blank();          // synced document
 let PH = {};              // person id -> {d: dataURL|null, t: updated ms}
 let acct = null;          // {label, key}; label stays on this device only
@@ -155,7 +155,7 @@ function mergeList(a, b, del){
 function merge(L, R){
   const del = {...(R.deleted||{})};
   for(const [k,v] of Object.entries(L.deleted||{})) del[k] = Math.max(v, del[k]||0);
-  return {v:1, deleted:del, people:mergeList(L.people,R.people,del), groups:mergeList(L.groups,R.groups,del), log:mergeList(L.log,R.log,del), plans:mergeList(L.plans,R.plans,del),
+  return {v:1, deleted:del, people:mergeList(L.people,R.people,del), groups:mergeList(L.groups,R.groups,del), log:mergeList(L.log,R.log,del), plans:mergeList(L.plans,R.plans,del), sets:mergeList(L.sets,R.sets,del),
           settings: ((R.settings&&R.settings.u)||0) > ((L.settings&&L.settings.u)||0) ? R.settings : (L.settings||blank().settings)};
 }
 
@@ -205,7 +205,7 @@ function openOrbitGroups(){
 }
 
 function renderNav(){
-  const v = ['person','cards'].includes(ui.view) ? 'people' : ui.view;
+  const v = ['person','cards','set'].includes(ui.view) ? 'people' : ui.view;
   const sw = g => colourOn() ? `<i class="sw" style="background:${gHex(g)}"></i>` : '';
   $('#side').innerHTML =
     `<div class="brand">Network<span id="syncdot" data-s="${sync.state}" title="Sync status"></span></div>` +
@@ -439,8 +439,12 @@ views.person = () => {
     <div>
       ${faceBox(p,'portrait')}
       <div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
+      <div class="pactions">
+        ${isProspect(p) ? `<button onclick="markMet('${p.id}')">✓ Mark as met</button>` : p.catchup ? `<button class="on" onclick="setCatchup('${p.id}',false)">✓ Catching up</button>` : `<button onclick="setCatchup('${p.id}',true)">+ Catch up</button>`}
+        <button onclick="openPlanSheet(null,'${p.id}')">Schedule</button>
+        <button onclick="openEntrySheet(null,'${p.id}')">Log</button>
+      </div>
       <div class="facts">
-        ${isProspect(p) ? '' : `<div><span>Catch up</span><span>${p.catchup ? `<span class="tagline">On your list</span> <button class="glink grey" style="margin-left:8px" onclick="setCatchup('${p.id}',false)">Remove</button>` : `<button class="btn small ghost" onclick="setCatchup('${p.id}',true)">+ Want to catch up</button>`}</span></div>`}
         ${isProspect(p) ? `<div><span>Status</span><span><span class="tagline">Want to meet</span> <button class="glink" style="margin-left:8px" onclick="markMet('${p.id}')">Mark as met</button></span></div>` : ''}
         ${fact('Role',esc(p.role))}${fact('Team',esc(p.team))}${fact('Firm',esc(p.firm))}${fact(isProspect(p)?'Via':'Met',esc(p.met))}
         ${fact('Groups',(p.groups||[]).map(id=>G(id)).filter(Boolean).map(g=>`<button class="glink" onclick="ui.filter='${g.id}';go('people')">${esc(g.name)}</button>`).join(', '))}
@@ -590,40 +594,106 @@ function downloadICS(id){
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-/* ---------- flashcards (simple flip-through, no scoring) ---------- */
+/* ---------- flashcards ---------- */
+// Decks: 'all' (everyone in People), a group id, or 'set:<id>' for a practice set (a deletable folder of cards kept apart from People).
+const SET = id => (D.sets||[]).find(s => s.id === id);
+const isSetDeck = d => typeof d === 'string' && d.startsWith('set:');
 function startCards(deck){ ui.fc = null; ui.cardDeck = deck || 'all'; go('cards') }
 function buildDeck(deck){
-  let ps = (deck === 'all' || !G(deck) ? [...D.people] : inG(deck)).filter(p => !isProspect(p));
-  ps = ps.map(p => [Math.random(), p.id]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
-  ui.fc = {deck, queue:ps, i:0, flipped:false};
+  let ids;
+  if(isSetDeck(deck)){ const s = SET(deck.slice(4)); ids = s ? s.cards.filter(c => ui.withKnown || !c.known).map(c => c.id) : [] }
+  else ids = (deck === 'all' || !G(deck) ? [...D.people] : inG(deck)).filter(p => !isProspect(p)).map(p => p.id);
+  ids = ids.map(id => [Math.random(), id]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+  ui.fc = {deck, queue:ids, i:0, flipped:false, again:new Set()};
 }
 function setDeck(d){ buildDeck(d); render() }
 function cardStep(n){ const f = ui.fc; f.i = Math.max(0, Math.min(f.queue.length, f.i + n)); f.flipped = false; render() }
+function cardKnow(known){
+  const f = ui.fc, s = SET(f.deck.slice(4)), c = s && s.cards.find(x => x.id === f.queue[f.i]); if(!c) return;
+  if(known){ c.known = true } else if(!f.again.has(c.id)){ f.queue.push(c.id); f.again.add(c.id) }   // "Again" comes back once at the end
+  touch(s); idb.set('data', D); schedulePush(); f.i++; f.flipped = false; render();
+}
+function cardHTML(x, front, deckLabel, col, t){
+  return `<div class="flip ${ui.fc.flipped?'on':''}" onclick="ui.fc.flipped=!ui.fc.flipped;this.classList.toggle('on')">
+      <div class="flip-in">
+        <div class="fa" style="${col?`background:${t.base};color:${onC(t.base)}`:''}"><div class="foot mono" style="border-top:0;border-bottom:1px solid currentColor;opacity:.85"><span>Who’s this?</span><span>${esc(deckLabel)}</span></div>${front}<div class="foot mono" style="opacity:.85"><span>Tap to flip</span><span>↻</span></div></div>
+        <div class="fb" ${col?`style="background:${t.wash}"`:''}><div class="pname">${esc(x.first)}<br>${esc(x.last)}</div>
+          <div class="facts">${x.role?`<div><span>Role</span><span>${esc(x.role)}</span></div>`:''}${x.team?`<div><span>Team</span><span>${esc(x.team)}</span></div>`:''}${x.firm?`<div><span>Firm</span><span>${esc(x.firm)}</span></div>`:''}${x.met?`<div><span>Met</span><span>${esc(x.met)}</span></div>`:''}</div>
+          ${x.hook?`<div class="hk"><span class="mono grey" style="display:block;margin-bottom:4px">Memory hook</span>${esc(x.hook)}</div>`:''}</div>
+      </div>
+    </div>`;
+}
 views.cards = () => {
   if(!ui.fc) buildDeck(ui.cardDeck || 'all');
-  const f = ui.fc, q = f.queue;
+  const f = ui.fc, q = f.queue, inSet = isSetDeck(f.deck), s = inSet ? SET(f.deck.slice(4)) : null;
+  if(inSet && !s){ ui.fc = null; ui.cardDeck = 'all'; return views.cards() }
   const head = `<div class="bar mono"><button onclick="go('people')">← People</button><span class="grey">${String(Math.min(f.i+1,q.length)).padStart(2,'0')}/${String(q.length).padStart(2,'0')}</span></div>
-    <div class="filters" style="border-top:0"><button class="${f.deck==='all'?'on':''}" onclick="setDeck('all')">Everyone</button>${D.groups.map(g=>`<button class="${f.deck===g.id?'on':''}" onclick="setDeck('${g.id}')">${esc(g.short||g.name)}</button>`).join('')}</div>`;
-  if(!q.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">No<br>cards.</div><p class="grey" style="margin-bottom:24px">Add people (ideally with a photo) to flip through them here.</p><button class="btn" onclick="openPersonSheet()">+ Add person</button></div>`;
-  if(f.i >= q.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">That’s<br>everyone.</div><p class="mono grey" style="margin-bottom:24px">${pad(q.length)} cards</p><div class="btnrow"><button class="btn" onclick="setDeck('${f.deck}')">Shuffle again →</button><button class="btn ghost" onclick="go('people')">Back to people</button></div></div>`;
+    <div class="filters" style="border-top:0"><button class="${f.deck==='all'?'on':''}" onclick="setDeck('all')">Everyone</button>${D.groups.map(g=>`<button class="${f.deck===g.id?'on':''}" onclick="setDeck('${g.id}')">${esc(g.short||g.name)}</button>`).join('')}${(D.sets||[]).map(x=>`<button class="setchip ${f.deck==='set:'+x.id?'on':''}" onclick="setDeck('set:${x.id}')">▣ ${esc(x.name)}</button>`).join('')}</div>
+    ${s ? `<div class="sethead"><div><b>${esc(s.name)}</b><small class="mono grey">${s.cards.filter(c=>c.known).length} of ${s.cards.length} known</small></div><button class="btn small ghost" onclick="go('set');ui.setId='${s.id}';render()">Open folder</button></div>` : ''}`;
+  if(!q.length) return head + (s
+    ? `<div class="drill"><div class="title" style="padding:40px 0 10px">All<br>known.</div><p class="grey" style="margin-bottom:24px">You’ve marked everyone in this set as known.</p><div class="btnrow"><button class="btn" onclick="ui.withKnown=true;setDeck('${f.deck}');ui.withKnown=false">Go through everyone again</button><button class="btn ghost" onclick="ui.setId='${s.id}';go('set')">Open folder</button></div></div>`
+    : `<div class="drill"><div class="title" style="padding:40px 0 10px">No<br>cards.</div><p class="grey" style="margin-bottom:24px">Add people (ideally with a photo) to flip through them here.</p><button class="btn" onclick="openPersonSheet()">+ Add person</button></div>`);
+  if(f.i >= q.length) return head + `<div class="drill"><div class="title" style="padding:40px 0 10px">${s?'Round<br>done.':'That’s<br>everyone.'}</div><p class="mono grey" style="margin-bottom:24px">${s ? `${s.cards.filter(c=>c.known).length} of ${s.cards.length} known` : pad(q.length)+' cards'}</p><div class="btnrow"><button class="btn" onclick="setDeck('${f.deck}')">${s?'Keep going →':'Shuffle again →'}</button><button class="btn ghost" onclick="go('people')">Back to people</button></div></div>`;
+  if(s){
+    const c = s.cards.find(x => x.id === q[f.i]); if(!c){ f.i++; return views.cards() }
+    const t = tones(pal(s.pc||'kwm').hex), d = PH[c.id] && PH[c.id].d;
+    const front = d ? `<div class="big photo-big"><img src="${d}" alt=""></div>` : `<div class="big clue"><span class="mono" style="opacity:.7">No photo · clues</span><p>${esc([c.role,c.team,c.firm].filter(Boolean).join(', ')||'—')}</p>${c.met?`<p class="sm">${esc(c.met)}</p>`:''}${c.hook?`<p class="sm">“${esc(c.hook)}”</p>`:''}</div>`;
+    return head + `<div class="drill"><div class="prog">${q.map((_,k)=>`<i class="${k<f.i?'done':''}"></i>`).join('')}</div>${cardHTML(c, front, s.name, colourOn(), t)}
+      <div class="rate"><button onclick="cardStep(-1)" ${f.i===0?'disabled':''}>← Back</button><button onclick="cardKnow(false)">Again</button><button onclick="cardKnow(true)">Know it ✓</button></div>
+      <p class="mono grey" style="text-align:center;margin-top:12px">“Know it” takes them out of the deck · “Again” brings them back at the end</p></div>`;
+  }
   const p = P(q[f.i]); if(!p){ f.i++; return views.cards() }
-  const t = tones(pHex(p)), col = colourOn(), d = photoOf(p);
-  const g = G((p.groups||[]).find(id=>G(id)));
+  const g = G((p.groups||[]).find(id=>G(id))), d = photoOf(p);
   const front = d ? `<div class="big photo-big"><img src="${d}" alt=""></div>` :
     `<div class="big clue"><span class="mono" style="opacity:.7">No photo · clues</span><p>${esc([p.role,p.team,p.firm].filter(Boolean).join(', ')||'—')}</p>${p.met?`<p class="sm">Met: ${esc(p.met)}</p>`:''}${p.hook?`<p class="sm">“${esc(p.hook)}”</p>`:''}</div>`;
-  return head + `<div class="drill">
-    <div class="prog">${q.map((_,k)=>`<i class="${k<f.i?'done':''}"></i>`).join('')}</div>
-    <div class="flip ${f.flipped?'on':''}" onclick="ui.fc.flipped=!ui.fc.flipped;this.classList.toggle('on')">
-      <div class="flip-in">
-        <div class="fa" style="${col?`background:${t.base};color:${onC(t.base)}`:''}"><div class="foot mono" style="border-top:0;border-bottom:1px solid currentColor;opacity:.85"><span>Who’s this?</span><span>${esc(g?(g.short||g.name):'')}</span></div>${front}<div class="foot mono" style="opacity:.85"><span>Tap to flip</span><span>↻</span></div></div>
-        <div class="fb" ${col?`style="background:${t.wash}"`:''}><div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
-          <div class="facts">${p.role?`<div><span>Role</span><span>${esc(p.role)}</span></div>`:''}${p.team?`<div><span>Team</span><span>${esc(p.team)}</span></div>`:''}${p.met?`<div><span>Met</span><span>${esc(p.met)}</span></div>`:''}</div>
-          ${p.hook?`<div class="hk"><span class="mono grey" style="display:block;margin-bottom:4px">Memory hook</span>${esc(p.hook)}</div>`:''}</div>
-      </div>
-    </div>
-    <div class="rate"><button onclick="cardStep(-1)" ${f.i===0?'disabled':''}>← Back</button><button onclick="openPerson('${p.id}')">Open page</button><button onclick="cardStep(1)">Next →</button></div>
-  </div>`;
+  return head + `<div class="drill"><div class="prog">${q.map((_,k)=>`<i class="${k<f.i?'done':''}"></i>`).join('')}</div>${cardHTML(p, front, g?(g.short||g.name):'', colourOn(), tones(pHex(p)))}
+    <div class="rate"><button onclick="cardStep(-1)" ${f.i===0?'disabled':''}>← Back</button><button onclick="openPerson('${p.id}')">Open page</button><button onclick="cardStep(1)">Next →</button></div></div>`;
 };
+
+/* ---------- practice set folder ---------- */
+views.set = () => {
+  const s = SET(ui.setId) || (D.sets||[])[0]; if(!s){ ui.view = 'cards'; return views.cards() }
+  ui.setId = s.id;
+  const known = s.cards.filter(c => c.known).length;
+  const cards = s.cards.slice().sort((a,b) => (a.known - b.known) || `${a.first} ${a.last}`.localeCompare(`${b.first} ${b.last}`));
+  return `<div class="bar mono"><button onclick="startCards('set:${s.id}')">← Flashcards</button><span class="grey">Practice set</span></div>
+  <div class="title">${esc(s.name)}</div>
+  <p class="intro grey">A separate folder just for flashcards. These people aren’t in your People, Log or Orbit. Delete the folder when you’re done with it.</p>
+  <div class="stats"><button onclick="startCards('set:${s.id}')"><b>${pad(s.cards.length - known)}</b><span class="mono grey">To learn</span></button><button><b>${pad(known)}</b><span class="mono grey">Known</span></button><button onclick="startCards('set:${s.id}')"><b>▶</b><span class="mono grey">Practise</span></button></div>
+  ${cards.map(c => { const d = PH[c.id] && PH[c.id].d; return `<div class="tmrow ${c.known?'known':''}"><div class="prow" style="cursor:default"><div class="ph">${d?`<img src="${d}" alt="">`:esc(((c.first||'')[0]||'')+((c.last||'')[0]||''))}</div><div class="pr-main"><b>${esc(c.first+' '+c.last)}</b><small>${esc([c.role,c.firm].filter(Boolean).join(' · '))}</small></div></div>
+    <label class="mono tmbtn" style="display:grid;place-items:center;cursor:pointer">${d?'Photo ✓':'+ Photo'}<input type="file" accept="image/*" hidden onchange="setCardPhoto(this,'${s.id}','${c.id}')"></label>
+    <button class="mono tmbtn" onclick="toggleKnown('${s.id}','${c.id}')">${c.known?'✓ Known':'Mark known'}</button></div>` }).join('')}
+  <div class="btnrow pad" style="margin-top:22px"><button class="btn ghost" onclick="resetKnown('${s.id}')">Reset known</button><button class="btn ghost danger" style="border-color:#9A2B2B" onclick="confirmDeleteSet('${s.id}')">Delete this folder</button></div>`;
+};
+function toggleKnown(sid, cid){ const s = SET(sid), c = s.cards.find(x => x.id === cid); c.known = !c.known; touch(s); commit() }
+function resetKnown(sid){ const s = SET(sid); s.cards.forEach(c => c.known = false); touch(s); commit(); toast('Everyone’s back in the deck') }
+async function setCardPhoto(input, sid, cid){ const f = input.files && input.files[0]; if(!f) return; try{ setPhoto(cid, await compress(f)); touch(SET(sid)); commit(); toast('Photo added') }catch(e){ toast(e.message) } }
+function confirmDeleteSet(sid){
+  const s = SET(sid);
+  sheet(`<div class="title">Delete<br>folder?</div><p class="intro" style="padding-top:0">This deletes “${esc(s.name)}”: all ${s.cards.length} cards and their photos, on every device. It doesn’t touch anyone in your People.</p>
+    <div class="sheetbtns"><button onclick="closeSheet()">Cancel</button><button onclick="deleteSet('${sid}')">Delete</button></div>`);
+}
+function deleteSet(sid){
+  const s = SET(sid); s.cards.forEach(c => { if(PH[c.id]) setPhoto(c.id, null) });
+  D.sets = D.sets.filter(x => x.id !== sid); D.deleted[sid] = now(); ui.fc = null; ui.cardDeck = 'all';
+  closeSheet(); ui.view = 'people'; commit(); toast('Folder deleted');
+}
+// Move the clerks that were imported into People across into their own practice set.
+function clerksToSet(){
+  const ps = D.people.filter(p => p.id.startsWith('slc26-')); if(!ps.length || D.deleted['set-slc26']) return false;
+  D.sets = D.sets || [];
+  let s = SET('set-slc26'); if(!s){ s = {id:'set-slc26', name:'Allens summer clerks', pc:'allens', cards:[]}; D.sets.push(s) }
+  const busy = p => p.catchup || p.follow || (p.talk||[]).length || D.log.some(e => (e.people||[]).includes(p.id)) || D.plans.some(x => (x.people||[]).includes(p.id));
+  const t = now();
+  ps.forEach(p => {
+    if(!s.cards.some(c => c.id === p.id)) s.cards.push({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false});
+    if(busy(p)){ p.groups = (p.groups||[]).filter(g => g !== 'slc26-allens'); delete p.orbit; touch(p) }   // you've logged/planned with them: keep them in People too
+    else { D.people = D.people.filter(x => x.id !== p.id); D.deleted[p.id] = t }
+  });
+  if(G('slc26-allens')){ D.groups = D.groups.filter(g => g.id !== 'slc26-allens'); D.deleted['slc26-allens'] = t }
+  if(ui.filter === 'slc26-allens') ui.filter = 'all';
+  touch(s); return true;
+}
 
 /* ---------- settings ---------- */
 views.settings = () => {
@@ -901,12 +971,13 @@ async function importData(input){
   }catch(e){ toast('That isn’t a Network backup file') }
 }
 // Encrypted starter packs (kept encrypted because this repo and site are public)
-const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', prefix:'slc26-', owner:'ella', label:'Allens summer clerks 2026', count:33, code:'clerks-4322'}];
+const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', prefix:'slc26-', set:'set-slc26', owner:'ella', label:'Allens summer clerks 2026', count:33, code:'clerks-4322'}];
 const pendingPack = () => null;
 // Add starter packs automatically, once per device (never re-adds a group you've deleted)
 const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : '';
 // one-off tidy-ups for Ella's account
 function fixups(){
+  if(clerksToSet()){ commit(); toast('Clerks moved to their own flashcard folder') }
   // anything labelled just "Sydney" becomes "Allens Sydney": group names and short labels, and people's team, firm and met fields
   const isSyd = v => typeof v === 'string' && norm(v).replace(/[^a-z]/g,'') === 'sydney';
   let n = 0;
@@ -919,13 +990,15 @@ async function autoPacks(){
     // packs belong to one person's account only
     if(acctName() !== k.owner){
       if(localStorage.getItem('pack-done-'+k.group)){   // auto-added here earlier: take it back out (locally only, no sync tombstones)
-        D.people = D.people.filter(p => !p.id.startsWith(k.prefix)); D.groups = D.groups.filter(g => g.id !== k.group);
+        D.people = D.people.filter(p => !p.id.startsWith(k.prefix)); D.groups = D.groups.filter(g => g.id !== k.group); D.sets = (D.sets||[]).filter(x => x.id !== k.set);
         localStorage.removeItem('pack-done-'+k.group); if(ui.filter === k.group) ui.filter = 'all'; idb.set('data', D); render(); schedulePush();
       }
       continue;
     }
-    if(G(k.group) || D.deleted[k.group] || localStorage.getItem('pack-done-'+k.group)) continue;
-    try{ const pack = await decryptPack(k.file, k.code); D = merge(D, pack.data); localStorage.setItem('pack-done-'+k.group,'1'); commit(); toast(`${k.count} people added`) }
+    if(SET(k.set) || D.deleted[k.set] || D.people.some(p => p.id.startsWith(k.prefix)) || localStorage.getItem('pack-done-'+k.group)) continue;
+    try{ const pack = await decryptPack(k.file, k.code);
+      D.sets = D.sets || []; D.sets.push(touch({id:k.set, name:'Allens summer clerks', pc:'allens', cards:pack.data.people.map(p => ({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}))}));
+      localStorage.setItem('pack-done-'+k.group,'1'); commit(); toast(`Flashcard set added: ${k.count} clerks`) }
     catch(e){ console.warn('pack', e) }
   }
 }

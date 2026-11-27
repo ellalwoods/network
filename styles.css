@@ -338,3 +338,18 @@ input,button,textarea{-webkit-tap-highlight-color:transparent}
 .pc-face{border-radius:50%;width:78%;margin:0 auto 10px}
 .pcard{align-items:center;text-align:center}
 .photo img{border-radius:50%}
+
+/* person actions + practice sets */
+.pactions{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.pactions button{padding:14px 6px;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border-right:1px solid var(--ink)}
+.pactions button:last-child{border-right:0}
+.pactions button:first-child{background:var(--ink);color:var(--white)}
+.pactions button.on{background:var(--white);color:var(--ink)}
+.pactions button:hover{opacity:.85}
+.setchip{font-weight:600}
+.sethead{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--ink);background:var(--white)}
+@media (min-width:900px){.sethead{padding:12px 32px}}
+.sethead b{display:block;font-weight:600}
+.tmrow.known .pr-main b{color:var(--grey)}
+.tmrow.known .ph{opacity:.5}
+.btn.danger{color:#9A2B2B}
