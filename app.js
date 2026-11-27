@@ -380,7 +380,7 @@ views.people = () => {
       <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
       <button class="link mono" onclick="loadSamples()">Or explore with sample people →</button></div>`;
   return `
-  <div class="bar mono"><span>${today()}</span><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
+  <div class="bar mono"><button onclick="go('settings')">⚙ Settings</button><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
   <div class="title">People</div>
   ${packBar}
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
@@ -441,6 +441,7 @@ views.person = () => {
       <div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
       <div class="pactions">
         ${isProspect(p) ? `<button onclick="markMet('${p.id}')">✓ Mark as met</button>` : p.catchup ? `<button class="on" onclick="setCatchup('${p.id}',false)">✓ Catching up</button>` : `<button onclick="setCatchup('${p.id}',true)">+ Catch up</button>`}
+        ${isProspect(p) ? '' : inOrbit(p) ? `<button class="on" onclick="setOrbit('${p.id}',false)">✓ In orbit</button>` : `<button onclick="setOrbit('${p.id}',true)">+ Orbit</button>`}
         <button onclick="openPlanSheet(null,'${p.id}')">Schedule</button>
         <button onclick="openEntrySheet(null,'${p.id}')">Log</button>
       </div>

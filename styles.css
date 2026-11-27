@@ -340,7 +340,7 @@ input,button,textarea{-webkit-tap-highlight-color:transparent}
 .photo img{border-radius:50%}
 
 /* person actions + practice sets */
-.pactions{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.pactions{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));grid-auto-flow:column;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
 .pactions button{padding:14px 6px;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border-right:1px solid var(--ink)}
 .pactions button:last-child{border-right:0}
 .pactions button:first-child{background:var(--ink);color:var(--white)}
