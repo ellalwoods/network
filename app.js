@@ -248,7 +248,7 @@ function renderNav(){
     `<div class="mono grey" style="padding:22px 20px 8px">Groups</div>` +
     D.groups.map(g => `<button class="grp" onclick="ui.filter='${g.id}';go('people')"><span>${sw(g)}${esc(g.name)}</span><span>${pad(inG(g.id).length)}</span></button>`).join('') +
     `<button class="grp grey" onclick="openGroupSheet()"><span>+ New group</span><span></span></button>` +
-    ((D.sets||[]).length ? `<div class="mono grey" style="padding:22px 20px 8px">Flashcard folders</div>` + D.sets.map(x => `<button class="grp" onclick="startCards('set:${x.id}')"><span>▣ ${esc(x.name)}</span><span>${pad(x.cards.length)}</span></button>`).join('') : '') +
+    (D.sets||[]).map(x => `<button class="grp" onclick="openSet('${x.id}')"><span>▣ ${esc(x.name)}</span><span>${pad(x.cards.length)}</span></button>`).join('') +
     `<button class="navbtn ${v==='settings'?'on':''}" style="margin-top:auto;border-top:1px solid var(--soft)" onclick="go('settings')"><span>Settings</span><span>06</span></button>` +
     `<button class="newbtn" onclick="openAdd()">+ Add</button>`;
   $('#tabbar').innerHTML = NAV.slice(0,4).map(([k,l]) => `<button class="${v===k?'on':''}" onclick="go('${k}')">${l}</button>`).join('') +
@@ -263,7 +263,8 @@ function faceBox(p, cls, extraStyle=''){
   return `<div class="${cls}" style="${style}${extraStyle}">${d ? `<img src="${d}" alt="">` : esc(ini(p))}</div>`;
 }
 const row = (p, n, right='') => `<button class="ent" onclick="openPerson('${p.id}')"><span class="n">${pad(n)}</span>${faceBox(p,'ph')}<div style="min-width:0"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' / ') || '—')}</small></div>${right}</button>`;
-const groupFilters = (cur, fn, extra='') => `<div class="filters"><button class="${cur==='all'?'on':''}" onclick="${fn}('all')">All</button>${D.groups.map(g => `<button class="${cur===g.id?'on':''}" onclick="${fn}('${g.id}')">${colourOn()?`<i class="sw" style="background:${gHex(g)}"></i>`:''}${esc(g.short||g.name)}</button>`).join('')}${extra}</div>`;
+const groupFilters = (cur, fn, extra='') => `<div class="filters"><button class="${cur==='all'?'on':''}" onclick="${fn}('all')">All</button>${D.groups.map(g => `<button class="${cur===g.id?'on':''}" onclick="${fn}('${g.id}')">${colourOn()?`<i class="sw" style="background:${gHex(g)}"></i>`:''}${esc(g.short||g.name)}</button>`).join('')}${fn==='setFilter' ? (D.sets||[]).map(x => `<button onclick="openSet('${x.id}')">${esc(x.name)} ›</button>`).join('') : ''}${extra}</div>`;
+function openSet(id){ ui.setId = id; go('set') }
 const today = () => new Date().toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
 
 /* ---------- orbit ---------- */
@@ -410,7 +411,7 @@ function listHTML(){
 views.people = () => {
   const fol = D.people.filter(p => p.follow).length;
   const pk = pendingPack(), packBar = pk ? `<button class="composer" onclick="openPackSheet('${pk.file}')"><span><b>${esc(pk.label)}</b> <span class="grey">· ${pk.count} people ready to add</span></span><span class="mono">Add →</span></button>` : '';
-  if(!D.people.length) return `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>${packBar}${!acct && !localStorage.getItem('rolo-device-name') ? `<button class="composer" onclick="openDeviceName()"><span><b>Not signed in</b> <span class="grey">· tell Network whose device this is to load your folders</span></span><span class="mono">Set →</span></button>` : ''}${(D.sets||[]).map(x => `<button class="composer" onclick="startCards('set:${x.id}')"><span><b>▣ ${esc(x.name)}</b> <span class="grey">· flashcard folder</span></span><span class="mono">Practise →</span></button>`).join('')}
+  if(!D.people.length) return `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>${packBar}${!acct && !localStorage.getItem('rolo-device-name') ? `<button class="composer" onclick="openDeviceName()"><span><b>Not signed in</b> <span class="grey">· tell Network whose device this is to load your folders</span></span><span class="mono">Set →</span></button>` : ''}
     <div class="title">Your<br>people</div>
     <div class="empty"><p>A notebook of everyone you meet: who they are, where you met, and what you talked about. Add someone, then log what happens.</p>
       <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
@@ -420,7 +421,6 @@ views.people = () => {
   <div class="title">People</div>
   ${packBar}
   ${!acct && !localStorage.getItem('rolo-device-name') ? `<button class="composer" onclick="openDeviceName()"><span><b>Not signed in</b> <span class="grey">· tell Network whose device this is to load your folders</span></span><span class="mono">Set →</span></button>` : ''}
-  ${(D.sets||[]).map(x => `<button class="composer" onclick="startCards('set:${x.id}')"><span><b>▣ ${esc(x.name)}</b> <span class="grey">· flashcard folder · ${x.cards.filter(c=>c.known).length}/${x.cards.length} known</span></span><span class="mono">Practise →</span></button>`).join('')}
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
   <div class="search"><span class="mono grey">Search</span><input id="q" value="${esc(ui.q)}" placeholder="Name, team, or anything you wrote" oninput="ui.q=this.value;document.getElementById('list').innerHTML=listHTML()" autocomplete="off"></div>
   <div class="toolbar"><div class="seg">${SORTS.map(([k,l]) => `<button class="${ui.sort===k?'on':''}" onclick="setSort('${k}')">${l}</button>`).join('')}</div>
@@ -519,6 +519,7 @@ views.groups = () => `
   ${D.groups.map((g,i) => { const h = gHex(g); return `<div class="glrow" style="${colourOn()?`box-shadow:inset 6px 0 0 ${h};background:linear-gradient(90deg,${tones(h).wash},transparent 70%)`:''}">
       <button class="gl" onclick="ui.filter='${g.id}';go('people')"><span class="mono grey">${pad(i+1)}</span><b>${esc(g.name)}</b><span class="ct">${pad(inG(g.id).length)}</span></button>
       <button class="mono gedit ${g.orbit?'':'grey'}" onclick="setGroupOrbit('${g.id}',${!g.orbit})" title="${g.orbit?'Remove group from orbit':'Add group to orbit'}">${g.orbit?'● Orbit':'+ Orbit'}</button><button class="mono grey gedit" onclick="startCards('${g.id}')">Cards</button><button class="mono grey gedit" onclick="openGroupSheet('${g.id}')">Edit</button></div>` }).join('')}
+  ${(D.sets||[]).map(x => `<div class="glrow"><button class="gl" onclick="openSet('${x.id}')"><span class="mono grey">▣</span><b>${esc(x.name)}</b><span class="ct">${pad(x.cards.length)}</span></button><button class="mono grey gedit" onclick="startCards('set:${x.id}')">Practise</button><button class="mono grey gedit" onclick="openSet('${x.id}')">Open</button></div>`).join('')}
   <button class="gl" onclick="openGroupSheet()"><span class="mono grey">+</span><b class="grey">New group</b><span></span></button></div>`;
 
 /* ---------- plans: people to meet, talking points, scheduled coffees ---------- */
@@ -693,8 +694,9 @@ views.set = () => {
   ui.setId = s.id;
   const known = s.cards.filter(c => c.known).length;
   const cards = s.cards.slice().sort((a,b) => (a.known - b.known) || `${a.first} ${a.last}`.localeCompare(`${b.first} ${b.last}`));
-  return `<div class="bar mono"><button onclick="startCards('set:${s.id}')">← Flashcards</button><span class="grey">Practice set</span></div>
+  return `<div class="bar mono"><button onclick="go('people')">← People</button><button class="grey" onclick="renameSet('${s.id}')">Rename</button></div>
   <div class="title">${esc(s.name)}</div>
+  <div class="btnrow pad" style="margin-top:0"><button class="btn" onclick="startCards('set:${s.id}')">Practise →</button></div>
   <p class="intro grey">A separate folder just for flashcards. These people aren’t in your People, Log or Orbit. Delete the folder when you’re done with it.</p>
   <div class="stats"><button onclick="startCards('set:${s.id}')"><b>${pad(s.cards.length - known)}</b><span class="mono grey">To learn</span></button><button><b>${pad(known)}</b><span class="mono grey">Known</span></button><button onclick="startCards('set:${s.id}')"><b>▶</b><span class="mono grey">Practise</span></button></div>
   ${cards.map(c => { const d = PH[c.id] && PH[c.id].d; return `<div class="tmrow ${c.known?'known':''}"><div class="prow" onclick="openCard('${s.id}','${c.id}')"><div class="ph">${d?`<img src="${d}" alt="">`:esc(((c.first||'')[0]||'')+((c.last||'')[0]||''))}</div><div class="pr-main"><b>${esc(c.first+' '+c.last)}</b><small>${esc([c.role,c.firm].filter(Boolean).join(' · '))}</small></div></div>
@@ -730,6 +732,7 @@ function openCard(sid, cid){
     <div class="pactions"><button onclick="toggleKnown('${sid}','${cid}');openCard('${sid}','${cid}')">${c.known?'Mark not known':'✓ Mark known'}</button>
       <label style="display:grid;place-items:center;cursor:pointer;border-right:1px solid var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase">${d?'Change photo':'+ Photo'}<input type="file" accept="image/*" hidden onchange="setCardPhoto(this,'${sid}','${cid}').then(()=>openCard('${sid}','${cid}'))"></label>
       <button onclick="editCard('${sid}','${cid}')">Edit</button></div>
+    <div class="pactions">${P(cid) && P(cid).catchup ? `<button class="on" onclick="closeSheet();openPerson('${cid}')">✓ On plans · open page</button>` : `<button onclick="cardToPlans('${sid}','${cid}')">+ Add to plans</button>`}</div>
     <button class="link mono danger" style="margin:16px 20px 0" onclick="removeCard('${sid}','${cid}')">Remove from folder</button>
     <div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet()">Close</button></div></div>`);
 }
@@ -745,6 +748,13 @@ function editCard(sid, cid){
 function saveCard(e, sid, cid){ e.preventDefault(); const f = new FormData(e.target), s = SET(sid), c = s.cards.find(x => x.id === cid);
   for(const k of ['first','last','role','firm','team','hook']) c[k] = (f.get(k)||'').toString().trim(); touch(s); commit(); openCard(sid, cid) }
 function removeCard(sid, cid){ const s = SET(sid); s.cards = s.cards.filter(x => x.id !== cid); s.removed = [...(s.removed||[]), cid]; if(PH[cid] && !P(cid)) setPhoto(cid, null); touch(s); closeSheet(); commit(); toast('Removed from folder') }
+function renameSet(sid){ const s = SET(sid), v = prompt('Folder name', s.name); if(v && v.trim()){ s.name = v.trim(); touch(s); commit() } }
+// (1) any folder card can go on your plans: it becomes a person in People (linked to the card) and goes on the list
+function cardToPlans(sid, cid){
+  const s = SET(sid), c = s.cards.find(x => x.id === cid); let p = P(cid);
+  if(!p){ p = {id:c.id, n:Math.max(0,...D.people.map(x=>x.n||0))+1, first:c.first, last:c.last, role:c.role, team:c.team, firm:c.firm, met:c.met, hook:c.hook, groups:[], created:now()}; D.people.push(p); delete D.deleted[c.id] }
+  p.catchup = true; touch(p); commit(); toast(`${c.first} added to your plans`); openCard(sid, cid);
+}
 function toggleKnown(sid, cid){ const s = SET(sid), c = s.cards.find(x => x.id === cid); c.known = !c.known; touch(s); commit() }
 function resetKnown(sid){ const s = SET(sid); s.cards.forEach(c => c.known = false); touch(s); commit(); toast('Everyone’s back in the deck') }
 async function setCardPhoto(input, sid, cid){ const f = input.files && input.files[0]; if(!f) return; try{ setPhoto(cid, await compress(f)); touch(SET(sid)); commit(); toast('Photo added') }catch(e){ toast(e.message) } }
@@ -1066,6 +1076,7 @@ const pendingPack = () => null;
 const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : norm(localStorage.getItem('rolo-device-name') || '');
 // one-off tidy-ups for Ella's account
 function fixups(){
+  const cs = SET('set-slc26'); if(cs && cs.name === 'Allens summer clerks' && !cs.renamed){ cs.name = 'Allens Sydney clerks'; cs.renamed = true; touch(cs); commit() }
   if(clerksToSet()){ commit(); toast('Clerks moved to their own flashcard folder') }
   // anything labelled just "Sydney" becomes "Allens Sydney": group names and short labels, and people's team, firm and met fields
   const isSyd = v => typeof v === 'string' && norm(v).replace(/[^a-z]/g,'') === 'sydney';
@@ -1074,8 +1085,17 @@ function fixups(){
   D.people.forEach(p => { let c = false; for(const k of ['team','firm','met','role']) if(isSyd(p[k])){ p[k] = 'Allens Sydney'; c = true } if(c){ touch(p); n++ } });
   if(n){ commit(); toast(`Updated ${n} “Sydney” label${n>1?'s':''} to “Allens Sydney”`) }
 }
+async function topUpPack(k){
+  const have = SET(k.set);
+  try{ const head = await (await fetch(k.file, {cache:'no-store'})).json();
+    if((have.packV||1) < (head.v||1)){ const pack = await decryptPack(k.file, k.code), ids = new Set(have.cards.map(c => c.id)), gone = new Set(have.removed||[]); let n = 0;
+      pack.data.people.forEach(p => { if(!ids.has(p.id) && !gone.has(p.id)){ have.cards.push({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}); n++ } });
+      have.packV = head.v; touch(have); commit(); if(n) toast(`${n} added to ${have.name}`) } }catch(e){ console.warn('pack top-up', e) }
+}
 async function autoPacks(){
   for(const k of PACKS){
+    // folder already on this device: top it up with anyone added to the list since (once per list version)
+    if(SET(k.set)){ await topUpPack(k); continue }
     // packs belong to one person's account only
     if(acctName() !== k.owner){
       if(localStorage.getItem('pack-done-'+k.group)){   // auto-added here earlier: take it back out (locally only, no sync tombstones)
@@ -1084,7 +1104,6 @@ async function autoPacks(){
       }
       continue;
     }
-    // folder already here: top it up with anyone added to the list since (once per list version)
     const have = SET(k.set);
     if(have){
       try{ const head = await (await fetch(k.file, {cache:'no-store'})).json();
@@ -1095,7 +1114,7 @@ async function autoPacks(){
     }
     if(D.deleted[k.set] || D.people.some(p => p.id.startsWith(k.prefix)) || localStorage.getItem('pack-done-'+k.group)) continue;
     try{ const pack = await decryptPack(k.file, k.code);
-      D.sets = D.sets || []; D.sets.push(touch({id:k.set, name:'Allens summer clerks', pc:'allens', packV:3, cards:pack.data.people.map(p => ({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}))}));
+      D.sets = D.sets || []; D.sets.push(touch({id:k.set, name:'Allens Sydney clerks', renamed:true, pc:'allens', packV:3, cards:pack.data.people.map(p => ({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}))}));
       localStorage.setItem('pack-done-'+k.group,'1'); commit(); toast(`Flashcard set added: ${k.count} clerks`) }
     catch(e){ console.warn('pack', e) }
   }
@@ -1208,7 +1227,7 @@ async function boot(){
   if(!acct && !localStorage.getItem('rolo-skip-login') && SYNC_ON) ui.view = 'login';
   render();
   if(acct) await syncNow();
-  autoPacks(); fixups();
+  fixups(); autoPacks();
   if(!localStorage.getItem('recrop-v1')) setTimeout(async () => { await recentrePhotos(true); localStorage.setItem('recrop-v1','1') }, 1500);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') syncNow() });
   window.addEventListener('online', () => syncNow());
