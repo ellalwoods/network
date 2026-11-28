@@ -359,3 +359,9 @@ input,button,textarea{-webkit-tap-highlight-color:transparent}
 .tmrow .pr-main small{white-space:normal}
 .cardview .pname{font-size:40px}
 .cardview .pactions{border-top:1px solid var(--ink)}
+
+.adjwrap{padding:0 20px}
+#adjc{width:100%;max-width:340px;aspect-ratio:1;display:block;margin:0 auto;touch-action:none;cursor:grab;border-radius:6px}
+#adjz{width:100%;margin-top:10px;accent-color:#111110}
+.adjlink{display:block;padding:10px 20px 0;font-size:10.5px}
+@media (min-width:900px){.adjlink{padding:10px 32px 0}}

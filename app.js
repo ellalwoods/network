@@ -4,7 +4,7 @@
    through the rolo_* functions (see supabase/rolo.sql). The login itself is never sent:
    only a SHA-256 hash of "rolo:" + the normalised login leaves the device. */
 
-const APP_V = 32;   // bump with every release (matches version.json)
+const APP_V = 33;   // bump with every release (matches version.json)
 const CFG = window.ROLO_CONFIG || {};
 const SYNC_ON = !!(CFG.supabaseUrl && CFG.supabaseKey);
 const PROJECT = ((CFG.supabaseUrl||'').match(/https:\/\/([^.]+)\./)||[])[1] || '';
@@ -152,6 +152,36 @@ async function cropToFace(img){
 async function compress(file){
   const url = URL.createObjectURL(file);
   try{ return (await cropToFace(await loadImg(url))).d } finally { URL.revokeObjectURL(url) }
+}
+// Manual framing: drag to move, slider to zoom, inside a circle preview. Works on any stored photo (People or folder cards).
+const adj = {};
+async function openAdjust(id, back){
+  const d = PH[id] && PH[id].d; if(!d) return toast('No photo to adjust');
+  Object.assign(adj, {id, back, img: await loadImg(d), z:1, x:0, y:0});
+  sheet(`<div class="title">Adjust<br>photo</div>
+    <p class="intro grey" style="padding-top:0">Drag to move. Use the slider to zoom.</p>
+    <div class="adjwrap"><canvas id="adjc" width="600" height="600"></canvas></div>
+    <label class="fld"><span class="mono grey">Zoom</span><input type="range" id="adjz" min="0.5" max="3" step="0.01" value="1" oninput="const z=+this.value;adj.x*=z/adj.z;adj.y*=z/adj.z;adj.z=z;drawAdj()"></label>
+    <div class="sheetbtns"><button onclick="adjDone(false)">Cancel</button><button onclick="adjDone(true)">Save →</button></div>`);
+  const c = $('#adjc'); let drag = null;
+  c.onpointerdown = e => { drag = {x:e.clientX, y:e.clientY, ox:adj.x, oy:adj.y}; c.setPointerCapture(e.pointerId) };
+  c.onpointermove = e => { if(!drag) return; const k = 600 / c.getBoundingClientRect().width; adj.x = drag.ox + (e.clientX - drag.x)*k; adj.y = drag.oy + (e.clientY - drag.y)*k; drawAdj() };
+  c.onpointerup = c.onpointercancel = () => drag = null;
+  drawAdj();
+}
+function paintAdj(ctx, S){
+  const {img, z, x, y} = adj, base = S / Math.min(img.naturalWidth, img.naturalHeight), w = img.naturalWidth*base*z, h = img.naturalHeight*base*z, k = S/600;
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, S, S); ctx.drawImage(img, (S-w)/2 + x*k, (S-h)/2 + y*k, w, h);
+}
+function drawAdj(){
+  const c = $('#adjc'); if(!c) return; const g = c.getContext('2d'); paintAdj(g, 600);
+  g.save(); g.fillStyle = 'rgba(243,242,238,.82)'; g.beginPath(); g.rect(0,0,600,600); g.arc(300,300,298,0,Math.PI*2,true); g.fill('evenodd'); g.restore();
+  g.strokeStyle = '#111110'; g.lineWidth = 2; g.beginPath(); g.arc(300,300,298,0,Math.PI*2); g.stroke();
+}
+function adjDone(save){
+  if(save){ const c = document.createElement('canvas'); c.width = c.height = 420; paintAdj(c.getContext('2d'), 420); setPhoto(adj.id, c.toDataURL('image/jpeg', .86));
+    const p = P(adj.id); if(p) touch(p); (D.sets||[]).forEach(s => { if(s.cards.some(x => x.id === adj.id)) touch(s) }); commit(); toast('Photo adjusted') }
+  closeSheet(); if(adj.back) adj.back();
 }
 async function recentrePhotos(silent){
   // every stored photo (People and flashcard folders): fit round avatars to the circle, otherwise centre on the face
@@ -477,6 +507,7 @@ views.person = () => {
   <div class="profile" style="border-top:0">
     <div>
       ${faceBox(p,'portrait')}
+      ${photoOf(p) ? `<button class="link mono adjlink" onclick="openAdjust('${p.id}')">Adjust photo</button>` : ''}
       <div class="pname">${esc(p.first)}<br>${esc(p.last)}</div>
       <div class="pactions">
         ${p.catchup ? `<button class="on" onclick="setCatchup('${p.id}',false)">✓ On plans</button>` : `<button onclick="setCatchup('${p.id}',true)">+ Add to plans</button>`}
@@ -734,6 +765,7 @@ function openCard(sid, cid){
     <div class="pactions"><button onclick="toggleKnown('${sid}','${cid}');openCard('${sid}','${cid}')">${c.known?'Mark not known':'✓ Mark known'}</button>
       <label style="display:grid;place-items:center;cursor:pointer;border-right:1px solid var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase">${d?'Change photo':'+ Photo'}<input type="file" accept="image/*" hidden onchange="setCardPhoto(this,'${sid}','${cid}').then(()=>openCard('${sid}','${cid}'))"></label>
       <button onclick="editCard('${sid}','${cid}')">Edit</button></div>
+    ${d ? `<button class="link mono" style="margin:14px 20px 0" onclick="openAdjust('${cid}',()=>openCard('${sid}','${cid}'))">Adjust photo framing</button>` : ''}
     <div class="pactions">${P(cid) && P(cid).catchup ? `<button class="on" onclick="closeSheet();openPerson('${cid}')">✓ On plans · open page</button>` : `<button onclick="cardToPlans('${sid}','${cid}')">+ Add to plans</button>`}</div>
     <button class="link mono danger" style="margin:16px 20px 0" onclick="removeCard('${sid}','${cid}')">Remove from folder</button>
     <div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet()">Close</button></div></div>`);
