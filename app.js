@@ -4,7 +4,7 @@
    through the rolo_* functions (see supabase/rolo.sql). The login itself is never sent:
    only a SHA-256 hash of "rolo:" + the normalised login leaves the device. */
 
-const APP_V = 31;   // bump with every release (matches version.json)
+const APP_V = 32;   // bump with every release (matches version.json)
 const CFG = window.ROLO_CONFIG || {};
 const SYNC_ON = !!(CFG.supabaseUrl && CFG.supabaseKey);
 const PROJECT = ((CFG.supabaseUrl||'').match(/https:\/\/([^.]+)\./)||[])[1] || '';
@@ -491,6 +491,7 @@ views.person = () => {
         ${isProspect(p) ? '' : inOrbit(p) ? `<div><span>Orbit</span><span><span class="rings">${RINGS.map((l,k)=>`<button class="${(p.ring||3)===k+1?'on':''}" onclick="setRing('${p.id}',${k+1})">${l}</button>`).join('')}</span><button class="glink grey" style="margin-top:8px;display:block;font-size:13px" onclick="setOrbit('${p.id}',false)">Remove from orbit</button></span></div>`
           : `<div><span>Orbit</span><span><button class="btn small ghost" onclick="setOrbit('${p.id}',true)">+ Add to orbit</button></span></div>`}
         ${fact('Added', p.created ? esc(dayLabel(p.created)) : '')}
+        ${(D.sets||[]).map(x => `<div><span>Folder</span><span><button class="glink grey" onclick="moveToFolderUI('${p.id}','${x.id}')">Move to ${esc(x.name)}</button></span></div>`).join('')}
       </div>
     </div>
     <div>
@@ -751,6 +752,19 @@ function saveCard(e, sid, cid){ e.preventDefault(); const f = new FormData(e.tar
 function removeCard(sid, cid){ const s = SET(sid); s.cards = s.cards.filter(x => x.id !== cid); s.removed = [...(s.removed||[]), cid]; if(PH[cid] && !P(cid)) setPhoto(cid, null); touch(s); closeSheet(); commit(); toast('Removed from folder') }
 function renameSet(sid){ const s = SET(sid), v = prompt('Folder name', s.name); if(v && v.trim()){ s.name = v.trim(); touch(s); commit() } }
 // (1) any folder card can go on your plans: it becomes a person in People (linked to the card) and goes on the list
+// Move someone from People into a flashcard folder (keeps their photo; they leave People, Log chips and plans)
+function moveToFolder(pid, sid){
+  const p = P(pid), s = SET(sid); if(!p || !s) return false;
+  const same = c => c.id === p.id || norm(`${c.first} ${c.last}`) === norm(fullName(p));
+  let c = s.cards.find(same);
+  if(!c){ c = {id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}; s.cards.push(c) }
+  s.removed = (s.removed||[]).filter(id => id !== c.id);
+  if(PH[p.id] && PH[p.id].d && c.id !== p.id && !(PH[c.id] && PH[c.id].d)) setPhoto(c.id, PH[p.id].d);
+  D.people = D.people.filter(x => x.id !== p.id); D.deleted[p.id] = now();
+  D.plans.forEach(x => { if((x.people||[]).includes(p.id)){ x.people = x.people.filter(y => y !== p.id); touch(x) } });
+  touch(s); return true;
+}
+function moveToFolderUI(pid, sid){ const p = P(pid), s = SET(sid); if(moveToFolder(pid, sid)){ commit(); toast(`${p.first} moved to ${s.name}`); openSet(sid) } }
 function cardToPlans(sid, cid){
   const s = SET(sid), c = s.cards.find(x => x.id === cid); let p = P(cid);
   if(!p){ p = {id:c.id, n:Math.max(0,...D.people.map(x=>x.n||0))+1, first:c.first, last:c.last, role:c.role, team:c.team, firm:c.firm, met:c.met, hook:c.hook, groups:[], created:now()}; D.people.push(p); delete D.deleted[c.id] }
@@ -1093,6 +1107,11 @@ async function topUpPack(k){
       pack.data.people.forEach(p => { if(!ids.has(p.id) && !gone.has(p.id)){ have.cards.push({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}); n++ } });
       have.packV = head.v; touch(have); commit(); if(n) toast(`${n} added to ${have.name}`) } }catch(e){ console.warn('pack top-up', e) }
 }
+async function oneOffMoves(){
+  if(localStorage.getItem('move-1') || !SET('set-slc26')) return;
+  for(const p of [...D.people]) if(await sha(norm(fullName(p))) === '7ce59b85159c492d76f307780ccbe0e3ce4d5fa296c979b1f42cc0b3fc7527dd'){ moveToFolder(p.id, 'set-slc26'); commit(); toast(`${p.first} moved back to the clerks`) }
+  localStorage.setItem('move-1','1');
+}
 async function autoPacks(){
   for(const k of PACKS){
     // folder already on this device: top it up with anyone added to the list since (once per list version)
@@ -1242,7 +1261,7 @@ async function boot(){
   if(!acct && !localStorage.getItem('rolo-skip-login') && SYNC_ON) ui.view = 'login';
   render();
   if(acct) await syncNow();
-  fixups(); autoPacks();
+  fixups(); autoPacks().then(oneOffMoves);
   if(!localStorage.getItem('recrop-v1')) setTimeout(async () => { await recentrePhotos(true); localStorage.setItem('recrop-v1','1') }, 1500);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible'){ syncNow(); checkUpdate() } });
   checkUpdate();
