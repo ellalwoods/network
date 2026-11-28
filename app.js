@@ -4,7 +4,7 @@
    through the rolo_* functions (see supabase/rolo.sql). The login itself is never sent:
    only a SHA-256 hash of "rolo:" + the normalised login leaves the device. */
 
-const APP_V = 33;   // bump with every release (matches version.json)
+const APP_V = 34;   // bump with every release (matches version.json)
 const CFG = window.ROLO_CONFIG || {};
 const SYNC_ON = !!(CFG.supabaseUrl && CFG.supabaseKey);
 const PROJECT = ((CFG.supabaseUrl||'').match(/https:\/\/([^.]+)\./)||[])[1] || '';
@@ -420,10 +420,13 @@ function sections(list){
 }
 function personRow(p, m){
   const e = m[p.id];
-  return `<button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small>
+  return `<div class="prow-wrap"><button class="prow" onclick="openPerson('${p.id}')">${faceBox(p,'ph')}<div class="pr-main"><b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small>
     ${e ? `<span class="snip"><span class="mono grey">${esc(rel(e.t))}</span> ${esc(e.text.slice(0,90))}</span>` : p.met ? `<span class="snip"><span class="mono grey">Met</span> ${esc(p.met)}</span>` : ''}</div>
-    ${p.catchup ? `<span class="tagline">Plans</span>` : p.follow ? `<span class="tagline" ${tagStyle(p)}>Follow up</span>` : ''}</button>`;
+    </button><button class="plansbtn ${p.catchup?'on':''}" onclick="togglePlansRow('${p.id}')" aria-label="${p.catchup?'Remove from plans':'Add to plans'}">${p.catchup?'✓ Plans':'+ Plans'}</button></div>`;
 }
+function togglePlansRow(pid){ const p = P(pid); p.catchup = !p.catchup; touch(p); idb.set('data', D); schedulePush();
+  document.querySelectorAll(`.plansbtn[onclick*="'${pid}'"]`).forEach(b => { b.classList.toggle('on', p.catchup); b.textContent = p.catchup ? '✓ Plans' : '+ Plans' });
+  toast(p.catchup ? `${p.first} added to your plans` : `${p.first} removed from your plans`) }
 function personCard(p){
   return `<button class="pcard" onclick="openPerson('${p.id}')">${faceBox(p,'pc-face')}<b>${esc(fullName(p))}</b><small>${esc([p.role,p.team,p.firm].filter(Boolean).join(' · ') || '—')}</small></button>`;
 }

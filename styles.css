@@ -365,3 +365,12 @@ input,button,textarea{-webkit-tap-highlight-color:transparent}
 #adjz{width:100%;margin-top:10px;accent-color:#111110}
 .adjlink{display:block;padding:10px 20px 0;font-size:10.5px}
 @media (min-width:900px){.adjlink{padding:10px 32px 0}}
+
+/* every row has its own plans toggle */
+.prow-wrap{display:flex;align-items:center;border-bottom:1px solid var(--soft)}
+.prow-wrap .prow{border-bottom:0;flex:1;min-width:0;grid-template-columns:52px minmax(0,1fr)}
+@media (min-width:900px){.prow-wrap .prow{grid-template-columns:56px minmax(0,1fr)}}
+.plansbtn{flex:none;margin-right:20px;padding:7px 10px;border:1px solid var(--soft);font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey);white-space:nowrap}
+@media (min-width:900px){.plansbtn{margin-right:32px}}
+.plansbtn:hover{border-color:var(--ink);color:var(--ink)}
+.plansbtn.on{background:var(--ink);border-color:var(--ink);color:var(--white)}
