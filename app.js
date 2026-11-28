@@ -152,13 +152,22 @@ async function compress(file){
   const url = URL.createObjectURL(file);
   try{ return (await cropToFace(await loadImg(url))).d } finally { URL.revokeObjectURL(url) }
 }
-async function recentrePhotos(){
-  const ids = Object.keys(PH).filter(id => PH[id] && PH[id].d && P(id)); if(!ids.length) return toast('No photos yet');
-  toast('Finding faces…'); let n = 0;
-  for(const id of ids){ const img = await loadImg(PH[id].d), f = await findFace(img); if(!f) continue;
-    const {s} = cropBox(img.naturalWidth, img.naturalHeight, f); if(s > img.naturalWidth * .92) continue;   // already framed on the face
-    setPhoto(id, (await cropToFace(img)).d); n++ }
-  commit(); toast(n ? `Centred ${n} photo${n>1?'s':''} on faces` : 'Photos already look centred');
+async function recentrePhotos(silent){
+  // every stored photo (People and flashcard folders): fit round avatars to the circle, otherwise centre on the face
+  const ids = Object.keys(PH).filter(id => PH[id] && PH[id].d); if(!ids.length){ if(!silent) toast('No photos yet'); return 0 }
+  if(!silent) toast('Fixing photos…'); let n = 0;
+  for(const id of ids){
+    try{
+      const img = await loadImg(PH[id].d);
+      if(findCircle(img)){ setPhoto(id, (await cropToFace(img)).d); n++; continue }
+      const f = await findFace(img); if(!f) continue;
+      const {s} = cropBox(img.naturalWidth, img.naturalHeight, f); if(s > img.naturalWidth * .92) continue;   // already framed on the face
+      setPhoto(id, (await cropToFace(img)).d); n++;
+    }catch(e){ console.warn('recrop', id, e) }
+  }
+  if(n){ render(); schedulePush() }
+  if(!silent || n) toast(n ? `Fixed ${n} photo${n>1?'s':''}` : 'Photos already look right');
+  return n;
 }
 function setPhoto(id, d){ PH[id] = {d, t:now()}; idb.set('ph:'+id, PH[id]) }
 const photoOf = p => PH[p.id] && PH[p.id].d;
@@ -793,7 +802,7 @@ views.settings = () => {
     : `<button class="set" style="width:100%" onclick="openDeviceName()"><div><b>This device belongs to</b><small>${esc(localStorage.getItem('rolo-device-name') ? titleCase(localStorage.getItem('rolo-device-name')) : 'Not set')} · loads your folders without signing in</small></div><span class="mono grey">→</span></button>
       <button class="set" style="width:100%" onclick="startLogin('signin')"><div><b>Sign in to sync</b><small>Name + planet + constellation</small></div><span class="mono grey">→</span></button>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
-  <button class="set" style="width:100%" onclick="recentrePhotos()"><div><b>Centre photos on faces</b><small>Re-crops photos you’ve already added so the circles show their face</small></div><span class="mono grey">◎</span></button>
+  <button class="set" style="width:100%" onclick="recentrePhotos()"><div><b>Fix photo framing</b><small>Fits round photos to the circle and centres others on the face</small></div><span class="mono grey">◎</span></button>
   <button class="set" style="width:100%" onclick="exportData()"><div><b>Export backup</b><small>Download everyone, notes and photos as a file</small></div><span class="mono grey">↓</span></button>
   <label class="set" style="cursor:pointer"><div><b>Import backup</b><small>Merge a Network backup file into this orbit</small></div><span class="mono grey">↑</span><input type="file" accept="application/json,.json" hidden onchange="importData(this)"></label>
   ${samples ? `<button class="set" style="width:100%" onclick="removeSamples()"><div><b>Remove sample people</b><small>${samples} sample ${samples===1?'person':'people'}</small></div><span class="mono grey">×</span></button>` : ''}
@@ -1200,6 +1209,7 @@ async function boot(){
   render();
   if(acct) await syncNow();
   autoPacks(); fixups();
+  if(!localStorage.getItem('recrop-v1')) setTimeout(async () => { await recentrePhotos(true); localStorage.setItem('recrop-v1','1') }, 1500);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') syncNow() });
   window.addEventListener('online', () => syncNow());
   if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
