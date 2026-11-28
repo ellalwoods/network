@@ -375,7 +375,7 @@ function listHTML(){
 views.people = () => {
   const fol = D.people.filter(p => p.follow).length;
   const pk = pendingPack(), packBar = pk ? `<button class="composer" onclick="openPackSheet('${pk.file}')"><span><b>${esc(pk.label)}</b> <span class="grey">· ${pk.count} people ready to add</span></span><span class="mono">Add →</span></button>` : '';
-  if(!D.people.length) return `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>${packBar}
+  if(!D.people.length) return `<div class="bar mono"><span>${today()}</span><button class="grey" onclick="go('settings')">Settings</button></div>${packBar}${!acct && !localStorage.getItem('rolo-device-name') ? `<button class="composer" onclick="openDeviceName()"><span><b>Not signed in</b> <span class="grey">· tell Network whose device this is to load your folders</span></span><span class="mono">Set →</span></button>` : ''}${(D.sets||[]).map(x => `<button class="composer" onclick="startCards('set:${x.id}')"><span><b>▣ ${esc(x.name)}</b> <span class="grey">· flashcard folder</span></span><span class="mono">Practise →</span></button>`).join('')}
     <div class="title">Your<br>people</div>
     <div class="empty"><p>A notebook of everyone you meet: who they are, where you met, and what you talked about. Add someone, then log what happens.</p>
       <div class="btnrow"><button class="btn" onclick="openPersonSheet()">+ Add your first person</button><button class="btn ghost" onclick="openGroupSheet()">+ Create a group</button></div>
@@ -384,6 +384,7 @@ views.people = () => {
   <div class="bar mono"><button onclick="go('settings')">⚙ Settings</button><span class="barbtns">${fol?`<button class="grey" onclick="ui.folOpen=true;go('log')">${fol} follow-up${fol>1?'s':''} →</button>`:''}<button class="grey" onclick="go('groups')">Groups</button><button onclick="startCards('${ui.filter}')">Flashcards</button></span></div>
   <div class="title">People</div>
   ${packBar}
+  ${!acct && !localStorage.getItem('rolo-device-name') ? `<button class="composer" onclick="openDeviceName()"><span><b>Not signed in</b> <span class="grey">· tell Network whose device this is to load your folders</span></span><span class="mono">Set →</span></button>` : ''}
   ${(D.sets||[]).map(x => `<button class="composer" onclick="startCards('set:${x.id}')"><span><b>▣ ${esc(x.name)}</b> <span class="grey">· flashcard folder · ${x.cards.filter(c=>c.known).length}/${x.cards.length} known</span></span><span class="mono">Practise →</span></button>`).join('')}
   ${groupFilters(ui.filter,'setFilter',`<button onclick="openGroupSheet()">+ Group</button>`)}
   <div class="search"><span class="mono grey">Search</span><input id="q" value="${esc(ui.q)}" placeholder="Name, team, or anything you wrote" oninput="ui.q=this.value;document.getElementById('list').innerHTML=listHTML()" autocomplete="off"></div>
@@ -740,7 +741,8 @@ views.settings = () => {
   ${acct ? `<button class="set" style="width:100%" onclick="syncNow()"><div><b>Sync now</b></div><span class="mono grey">↻</span></button>
     <button class="set" style="width:100%" onclick="startLogin('change')"><div><b>Change planet &amp; constellation</b><small>Keeps all your people; you’ll use the new combination to sign in.</small></div><span class="mono grey">→</span></button>
     <button class="set" style="width:100%" onclick="confirmSwitch()"><div><b>Switch account</b><small>Signs out and clears this device.</small></div><span class="mono grey">→</span></button>`
-    : `<button class="set" style="width:100%" onclick="startLogin('signin')"><div><b>Sign in to sync</b><small>Name + planet + constellation</small></div><span class="mono grey">→</span></button>`}
+    : `<button class="set" style="width:100%" onclick="openDeviceName()"><div><b>This device belongs to</b><small>${esc(localStorage.getItem('rolo-device-name') ? titleCase(localStorage.getItem('rolo-device-name')) : 'Not set')} · loads your folders without signing in</small></div><span class="mono grey">→</span></button>
+      <button class="set" style="width:100%" onclick="startLogin('signin')"><div><b>Sign in to sync</b><small>Name + planet + constellation</small></div><span class="mono grey">→</span></button>`}
   <div class="sect mono" style="border-top:1px solid var(--ink);margin-top:-1px"><span>Data</span></div>
   <button class="set" style="width:100%" onclick="recentrePhotos()"><div><b>Centre photos on faces</b><small>Re-crops photos you’ve already added so the circles show their face</small></div><span class="mono grey">◎</span></button>
   <button class="set" style="width:100%" onclick="exportData()"><div><b>Export backup</b><small>Download everyone, notes and photos as a file</small></div><span class="mono grey">↓</span></button>
@@ -772,6 +774,15 @@ views.login = () => {
   <p class="loginnote">Capitals and spaces in your name don’t matter. ${change?'Your people stay exactly as they are.':'New combination? You’ll be asked to start a new orbit, and anything already on this device comes with you.'} Remember your combination: it can’t be recovered.</p>
   </div>`;
 };
+async function setDeviceName(e){ e.preventDefault(); const v = new FormData(e.target).get('n').toString().trim(); if(!v) return;
+  localStorage.setItem('rolo-device-name', v); closeSheet(); toast(`This device is ${titleCase(v)}’s`); await autoPacks(); fixups(); render() }
+function openDeviceName(){
+  sheet(`<form onsubmit="setDeviceName(event)"><div class="title">Whose<br>device?</div>
+    <p class="intro" style="padding-top:0">While you’re not signed in, this tells Network whose device this is, so your own folders load here. It stays on this device only.</p>
+    <label class="fld"><span class="mono grey">Your first name</span><input name="n" value="${esc(localStorage.getItem('rolo-device-name')||'')}" autocomplete="off" autocapitalize="words" required></label>
+    <div class="sheetbtns"><button type="button" onclick="closeSheet()">Cancel</button><button type="submit">Save →</button></div></form>`);
+  setTimeout(() => $('#sheet [name=n]').focus(), 50);
+}
 function skipLogin(){ localStorage.setItem('rolo-skip-login','1'); go(ui.login.mode==='change'?'settings':'people') }
 async function submitLogin(){
   const L = ui.login; if(!loginReady() || L.busy) return;
@@ -993,7 +1004,8 @@ async function importData(input){
 const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', prefix:'slc26-', set:'set-slc26', owner:'ella', label:'Allens summer clerks 2026', count:35, code:'clerks-4322'}];
 const pendingPack = () => null;
 // Add starter packs automatically, once per device (never re-adds a group you've deleted)
-const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : '';
+// whose device this is: the signed-in name, or (until sync works) a name set on this device only
+const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : norm(localStorage.getItem('rolo-device-name') || '');
 // one-off tidy-ups for Ella's account
 function fixups(){
   if(clerksToSet()){ commit(); toast('Clerks moved to their own flashcard folder') }
