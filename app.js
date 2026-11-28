@@ -990,7 +990,7 @@ async function importData(input){
   }catch(e){ toast('That isn’t a Network backup file') }
 }
 // Encrypted starter packs (kept encrypted because this repo and site are public)
-const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', prefix:'slc26-', set:'set-slc26', owner:'ella', label:'Allens summer clerks 2026', count:34, code:'clerks-4322'}];
+const PACKS = [{file:'packs/allens-clerks.json', group:'slc26-allens', prefix:'slc26-', set:'set-slc26', owner:'ella', label:'Allens summer clerks 2026', count:35, code:'clerks-4322'}];
 const pendingPack = () => null;
 // Add starter packs automatically, once per device (never re-adds a group you've deleted)
 const acctName = () => acct ? norm(acct.label.split(' · ')[0]) : '';
@@ -1025,7 +1025,7 @@ async function autoPacks(){
     }
     if(D.deleted[k.set] || D.people.some(p => p.id.startsWith(k.prefix)) || localStorage.getItem('pack-done-'+k.group)) continue;
     try{ const pack = await decryptPack(k.file, k.code);
-      D.sets = D.sets || []; D.sets.push(touch({id:k.set, name:'Allens summer clerks', pc:'allens', packV:2, cards:pack.data.people.map(p => ({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}))}));
+      D.sets = D.sets || []; D.sets.push(touch({id:k.set, name:'Allens summer clerks', pc:'allens', packV:3, cards:pack.data.people.map(p => ({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}))}));
       localStorage.setItem('pack-done-'+k.group,'1'); commit(); toast(`Flashcard set added: ${k.count} clerks`) }
     catch(e){ console.warn('pack', e) }
   }
