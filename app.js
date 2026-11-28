@@ -4,6 +4,7 @@
    through the rolo_* functions (see supabase/rolo.sql). The login itself is never sent:
    only a SHA-256 hash of "rolo:" + the normalised login leaves the device. */
 
+const APP_V = 31;   // bump with every release (matches version.json)
 const CFG = window.ROLO_CONFIG || {};
 const SYNC_ON = !!(CFG.supabaseUrl && CFG.supabaseKey);
 const PROJECT = ((CFG.supabaseUrl||'').match(/https:\/\/([^.]+)\./)||[])[1] || '';
@@ -796,7 +797,7 @@ views.settings = () => {
     sync.last ? `Synced across your devices · last sync ${new Date(sync.last).toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit'})}` : 'Synced across your devices';
   const samples = D.people.filter(p => p.sample).length;
   return `
-  <div class="bar mono"><span>Network / Settings</span><span class="grey">v1.0</span></div>
+  <div class="bar mono"><span>Network / Settings</span><span class="grey">Version ${APP_V}</span></div>
   <div class="title">Settings</div>
   <div class="sect mono" style="border-top:1px solid var(--ink)"><span>Appearance</span></div>
   <div class="set"><div><b>Colour mode</b><small>Give each group its own colour across your people, log, orbit and flashcards. Off = black and white.</small></div>${tog(col,'setColour('+!col+')')}</div>
@@ -1209,6 +1210,20 @@ function softRender(){
   render();
 }
 
+/* ---------- updates: make installed (home-screen) copies pick up new versions ---------- */
+async function checkUpdate(){
+  try{
+    const j = await (await fetch('version.json?t=' + Date.now(), {cache:'no-store'})).json();
+    if((j.v||0) <= APP_V) return;
+    const last = +sessionStorage.getItem('rolo-reloaded') || 0;
+    if(Date.now() - last < 60000) return;                          // never loop if the new files aren't through yet
+    if($('#scrim').classList.contains('on')){ toast('Update ready: it’ll load when you close this'); return }
+    sessionStorage.setItem('rolo-reloaded', Date.now());
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if(reg) await reg.update().catch(()=>{});
+    location.reload();
+  }catch(e){ /* offline: try next time */ }
+}
+
 /* ---------- boot ---------- */
 async function boot(){
   $('#scrim').addEventListener('click', e => { if(e.target.id === 'scrim') closeSheet() });
@@ -1229,7 +1244,8 @@ async function boot(){
   if(acct) await syncNow();
   fixups(); autoPacks();
   if(!localStorage.getItem('recrop-v1')) setTimeout(async () => { await recentrePhotos(true); localStorage.setItem('recrop-v1','1') }, 1500);
-  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') syncNow() });
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible'){ syncNow(); checkUpdate() } });
+  checkUpdate();
   window.addEventListener('online', () => syncNow());
   if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 }

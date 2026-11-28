@@ -1,5 +1,5 @@
 // Offline support: app files are network-first (so updates show straight away) with a cache fallback.
-const CACHE = 'rolo-v30';
+const CACHE = 'rolo-v31';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.json', './icons/icon-192.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting() });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim() });
@@ -11,5 +11,6 @@ self.addEventListener('fetch', e => {
     return;
   }
   if(url.origin !== location.origin) return;
-  e.respondWith(fetch(req).then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(req, c)); return r }).catch(() => caches.match(req).then(hit => hit || caches.match('./index.html'))));
+  const fresh = req.mode === 'navigate' ? fetch(req.url, {cache:'no-store', credentials:'same-origin'}) : fetch(req, {cache:'no-store'});
+  e.respondWith(fresh.then(r => { const c = r.clone(); caches.open(CACHE).then(x => x.put(req, c)); return r }).catch(() => caches.match(req).then(hit => hit || caches.match('./index.html'))));
 });
