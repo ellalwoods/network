@@ -662,9 +662,8 @@ views.set = () => {
   <div class="title">${esc(s.name)}</div>
   <p class="intro grey">A separate folder just for flashcards. These people aren’t in your People, Log or Orbit. Delete the folder when you’re done with it.</p>
   <div class="stats"><button onclick="startCards('set:${s.id}')"><b>${pad(s.cards.length - known)}</b><span class="mono grey">To learn</span></button><button><b>${pad(known)}</b><span class="mono grey">Known</span></button><button onclick="startCards('set:${s.id}')"><b>▶</b><span class="mono grey">Practise</span></button></div>
-  ${cards.map(c => { const d = PH[c.id] && PH[c.id].d; return `<div class="tmrow ${c.known?'known':''}"><div class="prow" style="cursor:default"><div class="ph">${d?`<img src="${d}" alt="">`:esc(((c.first||'')[0]||'')+((c.last||'')[0]||''))}</div><div class="pr-main"><b>${esc(c.first+' '+c.last)}</b><small>${esc([c.role,c.firm].filter(Boolean).join(' · '))}</small></div></div>
-    <label class="mono tmbtn" style="display:grid;place-items:center;cursor:pointer">${d?'Photo ✓':'+ Photo'}<input type="file" accept="image/*" hidden onchange="setCardPhoto(this,'${s.id}','${c.id}')"></label>
-    <button class="mono tmbtn" onclick="toggleKnown('${s.id}','${c.id}')">${c.known?'✓ Known':'Mark known'}</button></div>` }).join('')}
+  ${cards.map(c => { const d = PH[c.id] && PH[c.id].d; return `<div class="tmrow ${c.known?'known':''}"><div class="prow" onclick="openCard('${s.id}','${c.id}')"><div class="ph">${d?`<img src="${d}" alt="">`:esc(((c.first||'')[0]||'')+((c.last||'')[0]||''))}</div><div class="pr-main"><b>${esc(c.first+' '+c.last)}</b><small>${esc([c.role,c.firm].filter(Boolean).join(' · '))}</small></div></div>
+    <button class="mono tmbtn" onclick="toggleKnown('${s.id}','${c.id}')">${c.known?'✓ Known':'Know it'}</button></div>` }).join('')}
   <div class="btnrow pad" style="margin-top:22px"><button class="btn" onclick="openAddCard('${s.id}')">+ Add someone</button><button class="btn ghost" onclick="resetKnown('${s.id}')">Reset known</button><button class="btn ghost danger" style="border-color:#9A2B2B" onclick="confirmDeleteSet('${s.id}')">Delete this folder</button></div>`;
 };
 function openAddCard(sid){
@@ -687,6 +686,30 @@ function addCardList(sid){
 function cardFromPerson(sid, pid){ const s = SET(sid), p = P(pid); s.cards.push({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false, linked:true}); touch(s); idb.set('data',D); schedulePush(); $('#aclist').innerHTML = addCardList(sid); toast(`${p.first} added to the folder`) }
 function newCard(e, sid){ e.preventDefault(); const f = new FormData(e.target), v = k => (f.get(k)||'').toString().trim(); const s = SET(sid);
   s.cards.push({id:'c-'+uid(), first:v('first'), last:v('last'), role:v('role'), firm:v('firm'), known:false}); touch(s); idb.set('data',D); schedulePush(); e.target.reset(); toast('Card added') }
+function openCard(sid, cid){
+  const s = SET(sid), c = s.cards.find(x => x.id === cid), d = PH[c.id] && PH[c.id].d;
+  const fact = (k,v) => v ? `<div><span>${k}</span><span>${esc(v)}</span></div>` : '';
+  sheet(`<div class="cardview">${d ? `<div class="portrait" style="aspect-ratio:1"><img src="${d}" alt=""></div>` : `<div class="portrait" style="aspect-ratio:2/1">${esc(((c.first||'')[0]||'')+((c.last||'')[0]||''))}</div>`}
+    <div class="pname">${esc(c.first)}<br>${esc(c.last)}</div>
+    <div class="facts">${fact('Role',c.role)}${fact('Team',c.team)}${fact('Firm',c.firm)}${fact('Met',c.met)}${fact('Memory hook',c.hook)}<div><span>Status</span><span>${c.known?'✓ Known':'Still learning'}</span></div></div>
+    <div class="pactions"><button onclick="toggleKnown('${sid}','${cid}');openCard('${sid}','${cid}')">${c.known?'Mark not known':'✓ Mark known'}</button>
+      <label style="display:grid;place-items:center;cursor:pointer;border-right:1px solid var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase">${d?'Change photo':'+ Photo'}<input type="file" accept="image/*" hidden onchange="setCardPhoto(this,'${sid}','${cid}').then(()=>openCard('${sid}','${cid}'))"></label>
+      <button onclick="editCard('${sid}','${cid}')">Edit</button></div>
+    <button class="link mono danger" style="margin:16px 20px 0" onclick="removeCard('${sid}','${cid}')">Remove from folder</button>
+    <div class="sheetbtns" style="grid-template-columns:1fr"><button onclick="closeSheet()">Close</button></div></div>`);
+}
+function editCard(sid, cid){
+  const c = SET(sid).cards.find(x => x.id === cid), v = k => esc(c[k]||'');
+  sheet(`<form onsubmit="saveCard(event,'${sid}','${cid}')"><div class="title">Edit<br>card</div>
+    <div class="two"><label class="fld"><span class="mono grey">First name</span><input name="first" value="${v('first')}" required autocapitalize="words"></label><label class="fld"><span class="mono grey">Last name</span><input name="last" value="${v('last')}" autocapitalize="words"></label></div>
+    <div class="two"><label class="fld"><span class="mono grey">Role</span><input name="role" value="${v('role')}"></label><label class="fld"><span class="mono grey">Firm</span><input name="firm" value="${v('firm')}"></label></div>
+    <label class="fld"><span class="mono grey">Team</span><input name="team" value="${v('team')}"></label>
+    <label class="fld"><span class="mono grey">Memory hook</span><input name="hook" value="${v('hook')}" placeholder="One detail to remember them by"></label>
+    <div class="sheetbtns"><button type="button" onclick="openCard('${sid}','${cid}')">Cancel</button><button type="submit">Save →</button></div></form>`);
+}
+function saveCard(e, sid, cid){ e.preventDefault(); const f = new FormData(e.target), s = SET(sid), c = s.cards.find(x => x.id === cid);
+  for(const k of ['first','last','role','firm','team','hook']) c[k] = (f.get(k)||'').toString().trim(); touch(s); commit(); openCard(sid, cid) }
+function removeCard(sid, cid){ const s = SET(sid); s.cards = s.cards.filter(x => x.id !== cid); s.removed = [...(s.removed||[]), cid]; if(PH[cid] && !P(cid)) setPhoto(cid, null); touch(s); closeSheet(); commit(); toast('Removed from folder') }
 function toggleKnown(sid, cid){ const s = SET(sid), c = s.cards.find(x => x.id === cid); c.known = !c.known; touch(s); commit() }
 function resetKnown(sid){ const s = SET(sid); s.cards.forEach(c => c.known = false); touch(s); commit(); toast('Everyone’s back in the deck') }
 async function setCardPhoto(input, sid, cid){ const f = input.files && input.files[0]; if(!f) return; try{ setPhoto(cid, await compress(f)); touch(SET(sid)); commit(); toast('Photo added') }catch(e){ toast(e.message) } }
@@ -1031,7 +1054,7 @@ async function autoPacks(){
     if(have){
       try{ const head = await (await fetch(k.file, {cache:'no-store'})).json();
         if((have.packV||1) < (head.v||1)){ const pack = await decryptPack(k.file, k.code), ids = new Set(have.cards.map(c => c.id)); let n = 0;
-          pack.data.people.forEach(p => { if(!ids.has(p.id)){ have.cards.push({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}); n++ } });
+          const gone = new Set(have.removed||[]); pack.data.people.forEach(p => { if(!ids.has(p.id) && !gone.has(p.id)){ have.cards.push({id:p.id, first:p.first, last:p.last, role:p.role, team:p.team, firm:p.firm, met:p.met, hook:p.hook, known:false}); n++ } });
           have.packV = head.v; touch(have); commit(); if(n) toast(`${n} added to ${have.name}`) } }catch(e){ console.warn('pack top-up', e) }
       continue;
     }

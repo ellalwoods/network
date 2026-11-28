@@ -353,3 +353,9 @@ input,button,textarea{-webkit-tap-highlight-color:transparent}
 .tmrow.known .pr-main b{color:var(--grey)}
 .tmrow.known .ph{opacity:.5}
 .btn.danger{color:#9A2B2B}
+
+.tmrow .prow{cursor:pointer}
+.tmrow .pr-main b{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.2}
+.tmrow .pr-main small{white-space:normal}
+.cardview .pname{font-size:40px}
+.cardview .pactions{border-top:1px solid var(--ink)}
