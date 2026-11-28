@@ -116,7 +116,33 @@ function cropBox(W, H, f){
   return {sx: Math.max(0, Math.min(W - s, cx - s/2)), sy: Math.max(0, Math.min(H - s, cy - s/2)), s};
 }
 const loadImg = src => new Promise((res,rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Could not read that image')); i.src = src });
+// If the picture is already a round avatar (a circle on a plain or transparent background), find that circle
+// so it fills our circle exactly, instead of zooming in on the face inside it.
+function findCircle(img){
+  const W = img.naturalWidth, H = img.naturalHeight, k = Math.min(1, 220 / Math.max(W, H)), w = Math.round(W*k), h = Math.round(H*k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', {willReadFrequently:true}); x.drawImage(img, 0, 0, w, h);
+  const px = x.getImageData(0, 0, w, h).data, at = (i, j) => { const o = (j*w + i)*4; return [px[o], px[o+1], px[o+2], px[o+3]] };
+  const corners = [[1,1],[w-2,1],[1,h-2],[w-2,h-2]].map(([i,j]) => at(i,j));
+  const dist = (a, b) => Math.abs(a[0]-b[0]) + Math.abs(a[1]-b[1]) + Math.abs(a[2]-b[2]);
+  const clear = corners.every(p => p[3] < 30), bg = corners[0];
+  if(!clear && !corners.every(p => p[3] > 200 && dist(p, bg) < 36)) return null;      // corners must be one plain colour, or transparent
+  const fg = (i, j) => { const p = at(i, j); return clear ? p[3] > 60 : (p[3] > 60 && dist(p, bg) > 48) };
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for(let j = 0; j < h; j++) for(let i = 0; i < w; i++) if(fg(i, j)){ if(i < x0) x0 = i; if(i > x1) x1 = i; if(j < y0) y0 = j; if(j > y1) y1 = j }
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  if(x1 < 0 || Math.min(bw, bh) < .3 * Math.min(w, h) || Math.abs(bw - bh) > .06 * Math.max(bw, bh)) return null;   // needs a roughly square blob
+  const cx = x0 + bw/2, cy = y0 + bh/2, r = Math.min(bw, bh)/2; let inside = 0, inFg = 0, out = 0, outFg = 0;
+  for(let j = y0; j <= y1; j++) for(let i = x0; i <= x1; i++){ const d = Math.hypot(i + .5 - cx, j + .5 - cy), f = fg(i, j);
+    if(d < r*.92){ inside++; if(f) inFg++ } else if(d > r*1.04){ out++; if(f) outFg++ } }
+  if(!inside || inFg / inside < .8 || !out || outFg / out > .12) return null;                             // round, not square
+  return {sx: x0 / k, sy: y0 / k, s: Math.max(bw, bh) / k};
+}
 async function cropToFace(img){
+  const circ = findCircle(img);
+  if(circ){ const S = 420, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S); const inset = circ.s * .01;
+    g.drawImage(img, circ.sx + inset, circ.sy + inset, circ.s - 2*inset, circ.s - 2*inset, 0, 0, S, S);
+    return {d: c.toDataURL('image/jpeg', .84), face: true, circle: true} }
   const W = img.naturalWidth, H = img.naturalHeight, f = await findFace(img), {sx, sy, s} = cropBox(W, H, f);
   const S = 420, c = document.createElement('canvas'); c.width = c.height = S;
   c.getContext('2d').drawImage(img, sx, sy, s, s, 0, 0, S, S);
